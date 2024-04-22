@@ -1,16 +1,31 @@
 var openSocket = undefined
 
 function convertEventToUniver(event) {
-  return {}
+  let data = []
+  event.tags
+
+  for (tagData of event.tags) {
+    data.push(tagData.slice(1))
+  }
+
+  return data
 }
 
 function convertUniverToEvent(univerData) {
+  let tags = []
+  for (tagData of univerData) {
+    tags.push(["data", ...tagData])
+  }
+
   let event = {
     kind: 35337, 
     content: "",
-    tags: [],
+    tags: tags,
   };
-  return nostrSign(event)
+
+  let evt = nostrSign(event)
+  console.log(JSON.stringify(evt))
+  return evt
 }
 
 async function fetchSpreadSheet(createNewSheet) {

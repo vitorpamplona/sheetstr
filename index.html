@@ -129,10 +129,33 @@
       const activeWorkbook = univerAPI.getActiveWorkbook()
       const saveData = activeWorkbook.getSnapshot();
 
-      saveSpreadSheet(saveData)
+      console.log(saveData)
+      data = []
+
+      for (sheetName of saveData.sheetOrder) {
+        console.log(sheetName);
+
+        let sheet = saveData.sheets[sheetName]
+
+        for (rowNumber of Object.keys(sheet.cellData)) {
+          let row = sheet.cellData[rowNumber]
+          for (colNumber of Object.keys(row)) {
+            let col = row[colNumber]
+            if (col.f)
+              data.push([sheet.name, UniverCore.numberToABC(colNumber), (parseInt(rowNumber)+1), col.f]);
+            else
+              data.push([sheet.name, UniverCore.numberToABC(colNumber), (parseInt(rowNumber)+1), col.v]);
+          }
+        }
+      }
+
+      console.log(data)
+
+      saveSpreadSheet(data)
     })
 
-    fetchSpreadSheet(() => { 
+    fetchSpreadSheet((data) => { 
+      console.log(data)
       univer.createUniverSheet({});
     }, )
   </script>
