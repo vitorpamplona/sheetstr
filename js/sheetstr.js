@@ -5,7 +5,8 @@ function convertEventToUniver(event) {
   event.tags
 
   for (tagData of event.tags) {
-    data.push(tagData.slice(1))
+    if (tagData[0]== "data")
+      data.push(tagData.slice(1))
   }
 
   return data
