@@ -65,7 +65,7 @@ async function fetchSpreadSheet(createNewSheet) {
       console.log("EOSE", relay)
 
       if (events.size == 0) {
-        createNewSheet({})
+        createNewSheet([])
       }
     }
   )
@@ -105,7 +105,9 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
     if (Object.keys(subscriptions).length > 0) {
       onState("Querying")
       for (const [key, sub] of Object.entries(subscriptions)) {
-        ws.send(JSON.stringify(['REQ', sub.id, sub.filter]))
+        let request = JSON.stringify(['REQ', sub.id, sub.filter])
+        console.log(request)
+        ws.send(request)
       }
     }
   }
