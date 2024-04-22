@@ -1,0 +1,2 @@
+# sheetstr
+Nostr Spreadsheets
