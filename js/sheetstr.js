@@ -208,3 +208,16 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
 
   return ws
 }
+
+async function signNostrAuthEvent(relay, auth_challenge) {
+  let event = {
+    kind: 22242, 
+    content: "",
+    tags: [
+      ["relay", relay],
+      ["challenge", auth_challenge]
+    ],
+  };
+
+  return await nostrSign(event)
+}
