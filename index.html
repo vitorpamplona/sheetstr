@@ -142,9 +142,9 @@
           for (colNumber of Object.keys(row)) {
             let col = row[colNumber]
             if (col.f)
-              data.push([sheet.name, UniverCore.numberToABC(colNumber), (parseInt(rowNumber)+1), col.f]);
+              data.push([sheet.name, UniverCore.numberToABC(colNumber), (parseInt(rowNumber)+1).toString(), col.f]);
             else
-              data.push([sheet.name, UniverCore.numberToABC(colNumber), (parseInt(rowNumber)+1), col.v]);
+              data.push([sheet.name, UniverCore.numberToABC(colNumber), (parseInt(rowNumber)+1).toString(), col.v.toString()]);
           }
         }
       }
@@ -155,7 +155,7 @@
     })
 
     fetchSpreadSheet((data) => { 
-      console.log(data)
+      console.log("Load from", data)
       univer.createUniverSheet({});
     }, )
   </script>
