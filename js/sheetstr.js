@@ -11,7 +11,7 @@ function convertEventToUniver(event) {
   return data
 }
 
-function convertUniverToEvent(univerData) {
+async function convertUniverToEvent(univerData) {
   let tags = [["d","SheetStr Demo"], ["alt","A spreadsheet"]]
   for (tagData of univerData) {
     tags.push(["data", ...tagData])
@@ -23,7 +23,7 @@ function convertUniverToEvent(univerData) {
     tags: tags,
   };
 
-  let evt = nostrSign(event)
+  let evt = await nostrSign(event)
   console.log(JSON.stringify(evt))
   return evt
 }
@@ -71,7 +71,7 @@ async function fetchSpreadSheet(createNewSheet) {
 }
 
 async function saveSpreadSheet(univerData) {
-  let eventStr = JSON.stringify(['EVENT', convertUniverToEvent(univerData)])
+  let eventStr = JSON.stringify(['EVENT', await convertUniverToEvent(univerData)])
   openSocket.send(eventStr)
   console.log("Sending new Event", openSocket, eventStr)
 }
