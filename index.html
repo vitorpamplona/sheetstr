@@ -190,10 +190,11 @@
         if (rowColData[3][0] == "=") {
           formula = rowColData[3]
         } else {
-          try {
-            value = parseFloat(rowColData[3]) 
+          let valueClass = Number(rowColData[3]);
+          if (!isNaN(valueClass)) {
+            value = parseFloat(rowColData[3])
             type = 2
-          } catch (e) {
+          } else {
             value = rowColData[3]
           }
         }
