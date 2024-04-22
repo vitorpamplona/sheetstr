@@ -29,7 +29,7 @@ async function convertUniverToEvent(univerData) {
 }
 
 async function fetchSpreadSheet(createNewSheet) {
-  let relay = "wss://nos.lol"
+  let relay = "wss://nostr.mom"
   let pubkey = "460c25e682fda7832b52d1f22d3d22b3176d972f60dcdc3212ed8c92ef85065c"
   if (window.nostr) {
     pubkey = await window.nostr.getPublicKey()
@@ -186,6 +186,8 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
 
     if (msgType === 'CLOSED') {
       const subState = subscriptions[messageArray[1]]
+
+      console.log("WS Closed", relay, subState,  messageArray[2])
 
       subState.done = true
     
