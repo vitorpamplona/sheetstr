@@ -70,7 +70,12 @@
 
   <script>
     async function onLoad() {
-      let dummy = await window.nostr.getPublicKey()
+      try {
+        let dummy = await window.nostr.getPublicKey()
+      } catch (e) {
+        
+      }
+      
 
       var {
         UniverCore,
