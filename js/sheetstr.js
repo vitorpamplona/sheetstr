@@ -1,4 +1,6 @@
 var ws = undefined
+var eventIds = new Set()
+var lastEvent = undefined
 
 function convertEventToDataArray(event) {
   let data = []
@@ -42,8 +44,6 @@ async function fetchSpreadSheet(createNewSheet) {
     }
   ]
 
-  let eventIds = new Set()
-
   await observe(
     relay, 
     filters,
@@ -52,9 +52,12 @@ async function fetchSpreadSheet(createNewSheet) {
     },
     (event) => { 
       console.log("Event Received", relay, event)
-      if (!eventIds.has(event.id)) {
+      if (!eventIds.has(event.id) && (!lastEvent || event.created_at > lastEvent.created_at)) {
+        console.log("Loading", relay, event)
         eventIds.add(event.id)
         createNewSheet(convertEventToDataArray(event))
+      } else {
+        console.log("Already has event", relay, event)
       }
     }, 
     (eventId, inserted, message) => {
@@ -71,7 +74,11 @@ async function fetchSpreadSheet(createNewSheet) {
 }
 
 async function saveSpreadSheet(univerData) {
-  let eventStr = JSON.stringify(['EVENT', await convertDataArrayToEvent(univerData)])
+  let event = await convertDataArrayToEvent(univerData)
+  eventIds.add(event.id)
+  lastEvent = event
+
+  let eventStr = JSON.stringify(['EVENT', event])
   ws.send(eventStr)
   console.log("Sending new Event", ws, eventStr)
 }
