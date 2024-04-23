@@ -77,6 +77,12 @@ async function saveSpreadSheet(univerData) {
 }
 
 async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
+  if (ws) {
+    if (ws.readyState <= 1)
+      ws.close()
+    ws = undefined
+  }
+
   ws = new WebSocket(relay)
   
   let isAuthenticating = false
