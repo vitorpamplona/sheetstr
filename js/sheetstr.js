@@ -31,10 +31,7 @@ async function convertDataArrayToEvent(univerData) {
 
 async function fetchSpreadSheet(createNewSheet) {
   let relay = "wss://nostr.mom"
-  let pubkey = "460c25e682fda7832b52d1f22d3d22b3176d972f60dcdc3212ed8c92ef85065c"
-  if (window.nostr) {
-    pubkey = await window.nostr.getPublicKey()
-  }
+  let pubkey = await window.nostr.getPublicKey()
 
   filters = [
     {
