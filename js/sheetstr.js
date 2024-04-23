@@ -73,7 +73,7 @@ async function fetchSpreadSheet(createNewSheet) {
 async function saveSpreadSheet(univerData) {
   let eventStr = JSON.stringify(['EVENT', await convertDataArrayToEvent(univerData)])
   ws.send(eventStr)
-  console.log("Sending new Event", openSocket, eventStr)
+  console.log("Sending new Event", ws, eventStr)
 }
 
 async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
