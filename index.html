@@ -69,7 +69,9 @@
   <div id="app"></div>
 
   <script>
-    function onLoad() {
+    async function onLoad() {
+      let dummy = await window.nostr.getPublicKey()
+
       var {
         UniverCore,
         UniverDesign,
