@@ -1,4 +1,4 @@
-var openSocket = undefined
+var ws = undefined
 
 function convertEventToDataArray(event) {
   let data = []
@@ -45,9 +45,9 @@ async function fetchSpreadSheet(createNewSheet) {
     }
   ]
 
-  let events = new Set()
+  let eventIds = new Set()
 
-  openSocket = await observe(
+  await observe(
     relay, 
     filters,
     (state) => {
@@ -55,8 +55,10 @@ async function fetchSpreadSheet(createNewSheet) {
     },
     (event) => { 
       console.log("Event Received", relay, event)
-      events.add(event)
-      createNewSheet(convertEventToDataArray(event))
+      if (!eventIds.has(event.id)) {
+        eventIds.add(event.id)
+        createNewSheet(convertEventToDataArray(event))
+      }
     }, 
     (eventId, inserted, message) => {
       console.log("Event Ack", relay, eventId, inserted, message)
@@ -64,7 +66,7 @@ async function fetchSpreadSheet(createNewSheet) {
     () => {
       console.log("EOSE", relay)
 
-      if (events.size == 0) {
+      if (eventIds.size == 0) {
         createNewSheet([])
       }
     }
@@ -78,7 +80,7 @@ async function saveSpreadSheet(univerData) {
 }
 
 async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
-  const ws = new WebSocket(relay)
+  ws = new WebSocket(relay)
   
   let isAuthenticating = false
 
@@ -206,6 +208,7 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
   }
   ws.onclose = (event) => {
     console.log("WS Close", relay, event)
+    setTimeout(() => { observe(relay, filters, onState, onNewEvent, onOk, onEOSE) }, 50)
   } 
 
   return ws
