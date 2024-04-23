@@ -1,6 +1,6 @@
 var openSocket = undefined
 
-function convertEventToUniver(event) {
+function convertEventToDataArray(event) {
   let data = []
   event.tags
 
@@ -12,7 +12,7 @@ function convertEventToUniver(event) {
   return data
 }
 
-async function convertUniverToEvent(univerData) {
+async function convertDataArrayToEvent(univerData) {
   let tags = [["d","SheetStr Demo"], ["alt","A spreadsheet"]]
   for (tagData of univerData) {
     tags.push(["data", ...tagData])
@@ -56,7 +56,7 @@ async function fetchSpreadSheet(createNewSheet) {
     (event) => { 
       console.log("Event Received", relay, event)
       events.add(event)
-      createNewSheet(convertEventToUniver(event))
+      createNewSheet(convertEventToDataArray(event))
     }, 
     (eventId, inserted, message) => {
       console.log("Event Ack", relay, eventId, inserted, message)
@@ -72,7 +72,7 @@ async function fetchSpreadSheet(createNewSheet) {
 }
 
 async function saveSpreadSheet(univerData) {
-  let eventStr = JSON.stringify(['EVENT', await convertUniverToEvent(univerData)])
+  let eventStr = JSON.stringify(['EVENT', await convertDataArrayToEvent(univerData)])
   openSocket.send(eventStr)
   console.log("Sending new Event", openSocket, eventStr)
 }
