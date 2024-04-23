@@ -73,7 +73,7 @@
       try {
         let dummy = await window.nostr.getPublicKey()
       } catch (e) {
-        
+
       }
       
 
@@ -145,6 +145,7 @@
       })
 
       fetchSpreadSheet((data) => { 
+        univer.dispose();
         univer.createUniverSheet(convertDataArrayToUniver(data));
       }, )
     }
