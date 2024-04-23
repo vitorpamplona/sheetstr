@@ -169,8 +169,6 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
           console.log("Didn't match filter", relay, event, subState.filter)
         } else if (subState.eventIds.has(event.id)) {
           console.log("Duplicated", relay, event, subState.filter)
-        } else if (subState.filter.limit && subState.counter >= subState.filter.limit) {
-
         } else {
           if (!subState.lastEvent || event.created_at < subState.lastEvent.created_at) {
             subState.lastEvent = event
