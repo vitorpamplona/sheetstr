@@ -69,82 +69,88 @@
   <div id="app"></div>
 
   <script>
+    var univer = undefined
+
     async function onLoad() {
       try {
         let dummy = await window.nostr.getPublicKey()
       } catch (e) {
 
       }
-      
-
-      var {
-        UniverCore,
-        UniverDesign,
-        UniverEngineRender,
-        UniverEngineFormula,
-        UniverDocs,
-        UniverDocsUi,
-        UniverUi,
-        UniverSheets,
-        UniverSheetsUi,
-        UniverSheetsNumfmt,
-        UniverSheetsFormula,
-        UniverFacade,
-      } = window
-
-      var univer = new UniverCore.Univer({
-        theme: UniverDesign.defaultTheme,
-        locale: UniverCore.LocaleType.EN_US,
-        locales: {
-          [UniverCore.LocaleType.EN_US]: {
-            ...UniverSheets.enUS,
-            ...UniverDocsUi.enUS,
-            ...UniverSheetsUi.enUS,
-            ...UniverUi.enUS,
-            ...UniverDesign.enUS,
-          },
-        },
-      });
-
-      univer.registerPlugin(UniverEngineRender.UniverRenderEnginePlugin);
-      univer.registerPlugin(UniverEngineFormula.UniverFormulaEnginePlugin);
-
-      univer.registerPlugin(UniverUi.UniverUIPlugin, {
-        container: "app",
-        header: true,
-        footer: true,
-      });
-
-      univer.registerPlugin(UniverDocs.UniverDocsPlugin, {
-        hasScroll: false,
-      });
-      univer.registerPlugin(UniverDocsUi.UniverDocsUIPlugin);
-
-      univer.registerPlugin(UniverSheets.UniverSheetsPlugin);
-      univer.registerPlugin(UniverSheetsUi.UniverSheetsUIPlugin);
-      univer.registerPlugin(UniverSheetsNumfmt.UniverSheetsNumfmtPlugin);
-      univer.registerPlugin(UniverSheetsFormula.UniverSheetsFormulaPlugin);    
-
-      const univerAPI = UniverFacade.FUniver.newAPI(univer)
-
-      univerAPI.onCommandExecuted((command, options) => {
-        // Only synchronize local mutations
-        if (command.type !== 2 || options?.fromCollab || options?.onlyLocal || command.id === 'doc.mutation.rich-text-editing' || command.id === 'sheet.mutation.set-worksheet-row-auto-height') {
-          return;
-        }
-        
-        const activeWorkbook = univerAPI.getActiveWorkbook()
-        const saveData = activeWorkbook.getSnapshot();
-
-        try { 
-          const data = convertUniverToDataArray(saveData)
-          saveSpreadSheet(data)
-        } catch (e) {
-          console.log(e)
-        }
-      })
 
       fetchSpreadSheet((data) => { 
+        var {
+          UniverCore,
+          UniverDesign,
+          UniverEngineRender,
+          UniverEngineFormula,
+          UniverDocs,
+          UniverDocsUi,
+          UniverUi,
+          UniverSheets,
+          UniverSheetsUi,
+          UniverSheetsNumfmt,
+          UniverSheetsFormula,
+          UniverFacade,
+        } = window
+
+        if (univer) {
+          univer.dispose()
+          univer = undefined
+        }
+
+        univer = new UniverCore.Univer({
+          theme: UniverDesign.defaultTheme,
+          locale: UniverCore.LocaleType.EN_US,
+          locales: {
+            [UniverCore.LocaleType.EN_US]: {
+              ...UniverSheets.enUS,
+              ...UniverDocsUi.enUS,
+              ...UniverSheetsUi.enUS,
+              ...UniverUi.enUS,
+              ...UniverDesign.enUS,
+            },
+          },
+        });
+
+        univer.registerPlugin(UniverEngineRender.UniverRenderEnginePlugin);
+        univer.registerPlugin(UniverEngineFormula.UniverFormulaEnginePlugin);
+
+        univer.registerPlugin(UniverUi.UniverUIPlugin, {
+          container: "app",
+          header: true,
+          footer: true,
+        });
+
+        univer.registerPlugin(UniverDocs.UniverDocsPlugin, {
+          hasScroll: false,
+        });
+        univer.registerPlugin(UniverDocsUi.UniverDocsUIPlugin);
+
+        univer.registerPlugin(UniverSheets.UniverSheetsPlugin);
+        univer.registerPlugin(UniverSheetsUi.UniverSheetsUIPlugin);
+        univer.registerPlugin(UniverSheetsNumfmt.UniverSheetsNumfmtPlugin);
+        univer.registerPlugin(UniverSheetsFormula.UniverSheetsFormulaPlugin);    
+
+        const univerAPI = UniverFacade.FUniver.newAPI(univer)
+
+        univerAPI.onCommandExecuted((command, options) => {
+          // Only synchronize local mutations
+          if (command.type !== 2 || options?.fromCollab || options?.onlyLocal || command.id === 'doc.mutation.rich-text-editing' || command.id === 'sheet.mutation.set-worksheet-row-auto-height') {
+            return;
+          }
+          
+          const activeWorkbook = univerAPI.getActiveWorkbook()
+          const saveData = activeWorkbook.getSnapshot();
+
+          try { 
+            const data = convertUniverToDataArray(saveData)
+            saveSpreadSheet(data)
+          } catch (e) {
+            console.log(e)
+          }
+        })
+
         univer.createUniverSheet(convertDataArrayToUniver(data));
       }, )
     }
