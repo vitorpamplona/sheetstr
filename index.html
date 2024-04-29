@@ -99,10 +99,15 @@
             loggedIn = true
             loadPage(pubkey)
           } else {
+            $("#sheets").html("");
+            showDashboard()
             loggedIn = false
           }
         }).catch((err) => {
           console.log("LoadUser Err", err);
+          $("#sheets").html("");
+          showDashboard()
+          loggedIn = false
         })
       }
     }
