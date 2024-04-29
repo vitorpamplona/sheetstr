@@ -127,9 +127,9 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
   if (ws) {
     if (ws.readyState <= 1)
       ws.close()
-    
+
     lastEvent = undefined
-    eventIds = Set()
+    eventIds = new Set()
     ws = undefined
   }
 
