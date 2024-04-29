@@ -59,7 +59,7 @@ async function fetchAllSpreadsheets(onReady) {
       if (!eventDtags.has(dTag) && (!lastEvent || event.created_at > lastEvent.created_at)) {
         console.log("Loading", relay, event)
         eventDtags.add(dTag)
-        onReady(dTag)
+        onReady(dTag, event.created_at)
       } else {
         console.log("Already has event", relay, event)
       }
