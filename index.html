@@ -67,15 +67,31 @@
 
   <script>
     var univer = undefined
+    var loggedIn = false
 
     document.addEventListener('nlAuth', (e) => {
-      console.log("nlauth")
-      //loadPage()
-    })
+      console.log("nlauth", e)
+      if (e.detail.type === 'login' || e.detail.type === 'signup') {
+        if (!loggedIn) {
+          loggedIn = true
+          loadPage()
+        }
+      } else {
+        if (loggedIn) {
+          loggedIn = false
+          loadPage()
+        }
+      }
+    });
 
     $(document).ready(function() {
-      if (window.nostr && window.nostr.getPublicKey()) {
-        loadPage()
+      if (window.nostr) {
+        window.nostr.getPublicKey(function (pubkey) {
+          if (pubkey) {
+            loggedIn = true
+            loadPage()
+          }
+        })
       }
     });
 
