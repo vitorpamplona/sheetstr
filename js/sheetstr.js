@@ -31,13 +31,12 @@ async function convertDataArrayToEvent(dTag, univerData) {
   return evt
 }
 
-async function fetchAllSpreadsheets(onReady) {
+async function fetchAllSpreadsheets(author, onReady) {
   let relay = "wss://nostr.mom"
-  let pubkey = await window.nostr.getPublicKey()
 
   filters = [
     {
-      "authors":[pubkey],
+      "authors":[author],
       "kinds":[35337],
       "limit":200
     }
@@ -73,13 +72,12 @@ async function fetchAllSpreadsheets(onReady) {
   )
 }
 
-async function fetchSpreadSheet(dTag, createNewSheet) {
+async function fetchSpreadSheet(author, dTag, createNewSheet) {
   let relay = "wss://nostr.mom"
-  let pubkey = await window.nostr.getPublicKey()
 
   filters = [
     {
-      "authors":[pubkey],
+      "authors":[author],
       "kinds":[35337],
       "#d":[dTag],
       "limit":1

@@ -74,40 +74,52 @@
       if (e.detail.type === 'login' || e.detail.type === 'signup') {
         if (!loggedIn) {
           loggedIn = true
-          loadPage()
+          setTimeout(function() {
+            loadUser()
+          }, 200);
         }
       } else {
         if (loggedIn) {
           loggedIn = false
-          loadPage()
+          setTimeout(function() {
+            loadUser()
+          }, 200);
         }
       }
     });
 
     $(document).ready(function() {
-      if (window.nostr) {
-        window.nostr.getPublicKey(function (pubkey) {
-          if (pubkey) {
-            loggedIn = true
-            loadPage()
-          }
-        })
-      }
+      loadUser()
     });
 
-    function loadPage() {
+    function loadUser() {
+      if (window.nostr) {
+        window.nostr.getPublicKey().then(function (pubkey) {
+          if (pubkey) {
+            loggedIn = true
+            loadPage(pubkey)
+          } else {
+            loggedIn = false
+          }
+        }).catch((err) => {
+          console.log("LoadUser Err", err);
+        })
+      }
+    }
+
+    function loadPage(author) {
       const queryString = window.location.search;
       const urlParams = new URLSearchParams(queryString);
       const dTag = urlParams.get('id')
 
-      console.log("onLoad", dTag)
+      console.log("onLoad", author, dTag)
       
       if (dTag) {
         hideDashboard()
-        loadId(dTag)
+        loadId(author, dTag)
       } else {
         showDashboard()
-        loadDashboard()
+        loadDashboard(author)
       }
     }
 
@@ -121,9 +133,9 @@
       $("#dashboard").show();
     }
 
-    async function loadDashboard() {
+    async function loadDashboard(author) {
       $("#sheets").html("");
-      fetchAllSpreadsheets((dTag, created_at) => { 
+      fetchAllSpreadsheets(author, (dTag, created_at) => { 
         console.log("found", dTag)
         $("#sheets").append("<tr onclick=\"document.location.href='?id="+dTag+"'\"><td>"+dTag+"</td><td class=\"right\">"+formatDate(created_at)+"</td></tr>")
       })
@@ -134,8 +146,8 @@
       return date.toLocaleString();
     }
 
-    async function loadId(dTag) {
-      fetchSpreadSheet(dTag, (name, data) => { 
+    async function loadId(author, dTag) {
+      fetchSpreadSheet(author, dTag, (name, data) => { 
         var {
           UniverCore,
           UniverDesign,
@@ -202,7 +214,7 @@
 
           try { 
             const data = convertUniverToDataArray(saveData)
-            saveSpreadSheet(dTag, data)
+            saveSpreadSheet(author, dTag, data)
           } catch (e) {
             console.log(e)
           }
