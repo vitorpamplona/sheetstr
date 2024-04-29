@@ -68,7 +68,18 @@
   <script>
     var univer = undefined
 
+    document.addEventListener('nlAuth', (e) => {
+      console.log("nlauth")
+      loadPage()
+    })
+
     $(document).ready(function() {
+      if (window.nostr && window.nostr.getPublicKey()) {
+        loadPage()
+      }
+    });
+
+    function loadPage() {
       const queryString = window.location.search;
       const urlParams = new URLSearchParams(queryString);
       const dTag = urlParams.get('id')
@@ -82,7 +93,7 @@
         showDashboard()
         loadDashboard()
       }
-    });
+    }
 
     async function hideDashboard() {
       $("#dashboard").hide();
@@ -108,12 +119,6 @@
     }
 
     async function loadId(dTag) {
-      try {
-        let dummy = await window.nostr.getPublicKey()
-      } catch (e) {
-
-      }
-
       fetchSpreadSheet(dTag, (name, data) => { 
         var {
           UniverCore,
