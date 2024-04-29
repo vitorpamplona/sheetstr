@@ -27,8 +27,8 @@ function convertUniverToDataArray(saveData) {
     return data
 }
 
-function convertDataArrayToUniver(data) {
-    console.log("Load from", data)
+function convertDataArrayToUniver(name, data) {
+    console.log("Load from", name, data)
 
     if (data.length === 0) {
         return {}
@@ -37,7 +37,7 @@ function convertDataArrayToUniver(data) {
             id: UniverCore.Tools.generateRandomId(6),
             locale: UniverCore.LocaleType.EN_US,
             appVersion: "0.1.7",
-            name: '',
+            name: name,
             sheetOrder: [],
             sheets: {},
             styles: {},

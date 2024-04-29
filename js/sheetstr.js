@@ -14,8 +14,8 @@ function convertEventToDataArray(event) {
   return data
 }
 
-async function convertDataArrayToEvent(univerData) {
-  let tags = [["d","SheetStr Demo"], ["alt","A spreadsheet"]]
+async function convertDataArrayToEvent(dTag, univerData) {
+  let tags = [["d",dTag], ["alt","A spreadsheet"]]
   for (tagData of univerData) {
     tags.push(["data", ...tagData])
   }
@@ -31,7 +31,7 @@ async function convertDataArrayToEvent(univerData) {
   return evt
 }
 
-async function fetchSpreadSheet(createNewSheet) {
+async function fetchAllSpreadsheets(onReady) {
   let relay = "wss://nostr.mom"
   let pubkey = await window.nostr.getPublicKey()
 
@@ -39,7 +39,49 @@ async function fetchSpreadSheet(createNewSheet) {
     {
       "authors":[pubkey],
       "kinds":[35337],
-      "#d":["SheetStr Demo"],
+      "limit":200
+    }
+  ]
+
+  var eventDtags = new Set()
+
+  await observe(
+    relay, 
+    filters,
+    (state) => {
+      console.log(relay, state)
+    },
+    (event) => { 
+      console.log("Event Received", relay, event)
+
+      let dTag = event.tags.find(([k, v]) => k === "d")[1]
+
+      if (!eventDtags.has(dTag) && (!lastEvent || event.created_at > lastEvent.created_at)) {
+        console.log("Loading", relay, event)
+        eventDtags.add(dTag)
+        onReady(dTag)
+      } else {
+        console.log("Already has event", relay, event)
+      }
+    }, 
+    (eventId, inserted, message) => {
+      console.log("Event Ack", relay, eventId, inserted, message)
+    },
+    () => {
+      console.log("EOSE", relay)
+    }
+  )
+}
+
+async function fetchSpreadSheet(dTag, createNewSheet) {
+  let relay = "wss://nostr.mom"
+  let pubkey = await window.nostr.getPublicKey()
+
+  filters = [
+    {
+      "authors":[pubkey],
+      "kinds":[35337],
+      "#d":[dTag],
       "limit":1
     }
   ]
@@ -55,7 +97,7 @@ async function fetchSpreadSheet(createNewSheet) {
       if (!eventIds.has(event.id) && (!lastEvent || event.created_at > lastEvent.created_at)) {
         console.log("Loading", relay, event)
         eventIds.add(event.id)
-        createNewSheet(convertEventToDataArray(event))
+        createNewSheet(dTag, convertEventToDataArray(event))
       } else {
         console.log("Already has event", relay, event)
       }
@@ -67,14 +109,14 @@ async function fetchSpreadSheet(createNewSheet) {
       console.log("EOSE", relay)
 
       if (eventIds.size == 0) {
-        createNewSheet([])
+        createNewSheet(dTag, [])
       }
     }
   )
 }
 
-async function saveSpreadSheet(univerData) {
-  let event = await convertDataArrayToEvent(univerData)
+async function saveSpreadSheet(dTag, univerData) {
+  let event = await convertDataArrayToEvent(dTag, univerData)
   eventIds.add(event.id)
   lastEvent = event
 
