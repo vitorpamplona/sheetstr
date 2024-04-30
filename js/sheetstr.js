@@ -1,6 +1,7 @@
 var ws = undefined
 var eventIds = new Set()
 var lastEvent = undefined
+var tentatives = 0
 
 function convertEventToDataArray(event) {
   let data = []
@@ -32,9 +33,10 @@ async function convertDataArrayToEvent(dTag, univerData) {
 }
 
 async function fetchAllSpreadsheets(author, onReady) {
+  tentatives = 0
   let relay = "wss://nostr.mom"
 
-  filters = [
+  let filters = [
     {
       "authors":[author],
       "kinds":[35337],
@@ -73,9 +75,10 @@ async function fetchAllSpreadsheets(author, onReady) {
 }
 
 async function fetchSpreadSheet(author, dTag, createNewSheet) {
+  tentatives = 0
   let relay = "wss://nostr.mom"
 
-  filters = [
+  let filters = [
     {
       "authors":[author],
       "kinds":[35337],
@@ -259,7 +262,10 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
   }
   ws.onclose = (event) => {
     console.log("WS Close", relay, event)
-    setTimeout(() => { observe(relay, filters, onState, onNewEvent, onOk, onEOSE) }, 50)
+    if (tentatives > 5) {
+      setTimeout(() => { observe(relay, filters, onState, onNewEvent, onOk, onEOSE) }, 150)
+    }
+    tentatives++
   } 
 
   return ws
