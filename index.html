@@ -84,7 +84,7 @@
           console.log("Logging Off")
           loggedIn = false
           setTimeout(function() {
-            loadUser()
+            logOff()
           }, 200);
         }
       }
@@ -94,7 +94,20 @@
       //loadUser()
     });
 
+    function logOff() {
+      $("#sheets").html("");
+      showDashboard()
+      loggedIn = false
+      if (tentatives) {
+        tentatives = 1000
+      }
+      if (ws) {
+        ws.close()
+      }
+    }
+
     function loadUser() {
+      console.log("loadUser")
       if (window.nostr) {
         window.nostr.getPublicKey().then(function (pubkey) {
           if (pubkey) {
@@ -102,21 +115,11 @@
             console.log("getPublicKey")
             loadPage(pubkey)
           } else {
-            $("#sheets").html("");
-            showDashboard()
-            loggedIn = false
-            if (tentatives) {
-              tentatives = 1000
-            }
-            if (ws) {
-              ws.close()
-            }
+            logOff()
           }
         }).catch((err) => {
           console.log("LoadUser Err", err);
-          $("#sheets").html("");
-          showDashboard()
-          loggedIn = false
+          logOff()
         })
       }
     }
