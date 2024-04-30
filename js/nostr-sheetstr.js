@@ -3,27 +3,70 @@ var eventIds = new Set()
 var lastEvent = undefined
 var tentatives = 0
 
-function convertEventToDataArray(event) {
+async function convertEventToDataArray(event) {
   let data = []
-  event.tags
 
   for (tagData of event.tags) {
     if (tagData[0]== "data")
       data.push(tagData.slice(1))
   }
 
+  try {
+    let myPubKey = await window.nostr.getPublicKey()
+    let ciphertext = event.tags.find(([k, v]) => k === "p" && v === myPubKey)[3]
+  
+    console.log("cyper", ciphertext)
+  
+    if (ciphertext) {
+      let thisVersionsPrivateKeyInHex = window.nostr.nip44.decrypt(event.pubkey, ciphertext)
+      let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(thisVersionsPrivateKeyInHex, bytesToHex(thisVersionsPublicKey))
+      let privateTags = window.NostrTools.nip44.v2.decrypt(event.content, conversationKey) 
+    
+      for (tagData of privateTags) {
+        if (tagData[0]== "data") {
+          console.log("Private data", tagData.slice[1])
+          data.push(tagData.slice(1))
+        }
+      }
+    } 
+  } catch (e) {
+    // not logged in
+  }
+
+
   return data
 }
 
-async function convertDataArrayToEvent(dTag, univerData) {
-  let tags = [["d",dTag], ["alt","A spreadsheet"]]
+async function convertDataArrayToEvent(dTag, shareWith, univerData) {
+  let thisVersionsPrivateKey = window.NostrTools.generateSecretKey()
+  let thisVersionsPublicKeyHex = window.NostrTools.getPublicKey(thisVersionsPrivateKey)
+  let thisVersionsPrivateKeyInHex = bytesToHex(thisVersionsPrivateKey)
+
+  console.log("New keys", thisVersionsPrivateKey, thisVersionsPublicKeyHex)
+
+  let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(thisVersionsPrivateKeyInHex, thisVersionsPublicKeyHex)
+
+  let tags = [
+    ["d",dTag], 
+    ["alt","A spreadsheet"]
+  ]
+  for (pubkey of shareWith) {
+    tags.push(["p", pubkey, "", await window.nostr.nip44.encrypt(pubkey, thisVersionsPrivateKeyInHex)])
+  }
   for (tagData of univerData) {
     tags.push(["data", ...tagData])
   }
 
+  let privateTags = []
+  for (tagData of univerData) {
+    privateTags.push(["data", ...tagData])
+  }
+
+  let content = window.NostrTools.nip44.v2.encrypt(JSON.stringify(privateTags), conversationKey) 
+
   let event = {
     kind: 35337, 
-    content: "",
+    content: content,
     tags: tags,
   };
 
@@ -74,7 +117,7 @@ async function fetchAllSpreadsheets(author, onReady) {
   )
 }
 
-async function fetchSpreadSheet(author, dTag, createNewSheet) {
+async function fetchSpreadSheet(author, dTag, createNewSheet, newAuthorMetadata) {
   tentatives = 0
   let relay = "wss://nostr.mom"
 
@@ -84,6 +127,9 @@ async function fetchSpreadSheet(author, dTag, createNewSheet) {
       "kinds":[35337],
       "#d":[dTag],
       "limit":1
+    }, {
+      "authors":[author],
+      "kinds":[0]
     }
   ]
 
@@ -93,14 +139,20 @@ async function fetchSpreadSheet(author, dTag, createNewSheet) {
     (state) => {
       console.log(relay, state)
     },
-    (event) => { 
+    async (event) => { 
       console.log("Event Received", relay, event)
-      if (!eventIds.has(event.id) && (!lastEvent || event.created_at > lastEvent.created_at)) {
-        console.log("Loading", relay, event)
-        eventIds.add(event.id)
-        createNewSheet(dTag, convertEventToDataArray(event))
-      } else {
-        console.log("Already has event", relay, event)
+      if (event.kind == 0) {
+        newAuthorMetadata(event.pubkey, JSON.parse(event.content).name)
+      } else if (event.kind == 35337) {
+        let shares = [event.pubkey, ...event.tags.filter(([k, v]) => k === "p").map(([k, v]) => v)]
+
+        if (!eventIds.has(event.id) && (!lastEvent || event.created_at > lastEvent.created_at)) {
+          console.log("Loading", relay, event)
+          eventIds.add(event.id)
+          createNewSheet(dTag, shares, await convertEventToDataArray(event))
+        } else {
+          console.log("Already has event", relay, event)
+        }
       }
     }, 
     (eventId, inserted, message) => {
@@ -132,8 +184,8 @@ async function deleteSpreadSheet(id, author, dTag) {
   console.log("Deleting Event", ws, eventStr)
 }
 
-async function saveSpreadSheet(author, dTag, univerData) {
-  let event = await convertDataArrayToEvent(dTag, univerData)
+async function saveSpreadSheet(author, dTag, shareWith, univerData) {
+  let event = await convertDataArrayToEvent(dTag, shareWith, univerData)
   eventIds.add(event.id)
   lastEvent = event
 

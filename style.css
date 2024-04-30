@@ -5,7 +5,15 @@ body {
 #header {
   padding-top: 10px;
   font-family: sans-serif;
-	text-align: center;
+}
+
+#mini-header {
+  padding-top: 5px;
+  padding-left: 10px;
+  padding-bottom: 0px;
+  margin-bottom: 0px;
+  line-height: 1em;
+  font-family: sans-serif;
 }
 
 #dashboard {
@@ -37,11 +45,11 @@ body {
     padding: 12px 15px;
 }
 
-.styled-table .right {
+.right {
   text-align: right;
 }
 
-.styled-table .center {
+.center {
   text-align: center;
 }
 

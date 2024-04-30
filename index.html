@@ -30,6 +30,12 @@
   <script src="https://unpkg.com/@univerjs/umd/lib/univer.full.umd.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/@univerjs/umd/lib/univer.css">
 
+  <script src="https://bundle.run/buffer@6.0.3"></script>
+  <script src="https://bundle.run/bech32@2.0.0"></script>
+
+  <script src="https://unpkg.com/browse/@noble/secp256k1@2.1.0/index.js"></script>
+  <script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
+
   <script src="js/jquery-3.6.2.min.js"></script>
   <script src="js/nostr-sign.js"></script>
   <script src="js/nostr-filter.js"></script>
@@ -41,7 +47,7 @@
 
 <body>
   <div id="dashboard">
-    <header id="header">
+    <header id="header" class="center">
       <h1>Your Public Spreadsheets</h1>
     </header>
     <table class="styled-table">
@@ -64,12 +70,29 @@
       </button>
     </div>
   </div>
-  <div id="app"></div>
+  <div id="app-container">
+    <header id="mini-header">
+      <h2>Your Public Spreadsheets</h2>
+      <p>Shared with: <span id="shares"></span>      
+        <input type="text" style="margin-right:3px;" class="cool-field" id="newPubkey" name="newPubkey" value="" placeholder="Add npub">
+        <button id="create-button" style="margin-bottom: 1px;" onclick="addNewShare()">
+          Share
+        </button>
+      </p>
+
+    </header>
+    <div id="app"></div>
+  </div>
+
 
   <script>
     var univer = undefined
+    var univerAPI = undefined
     var loggedIn = false
     var initialized = false
+
+    var userNames = new Map()
+    var sharingWith = new Set()
 
     document.addEventListener('nlAuth', (e) => {
       initialized = true
@@ -167,11 +190,11 @@
 
     async function hideDashboard() {
       $("#dashboard").hide();
-      $("#app").show();
+      $("#app-container").show();
     }
     
     async function showDashboard() {
-      $("#app").hide();
+      $("#app-container").hide();
       $("#dashboard").show();
     }
 
@@ -197,8 +220,44 @@
       }, 500);
     }
 
+    function updateShares() {
+      let component = $("#shares")
+      component.html("")
+      sharingWith.forEach((pubkey) => { 
+        if (userNames.has(pubkey)) 
+          component.append("<a href=\"?author="+pubkey+"\">"+userNames.get(pubkey)+"</a>, ")
+        else 
+          component.append("<a href=\"?author="+pubkey+"\">"+pubkey.substring(0, 6)+".."+pubkey.substring(pubkey.length-6, pubkey.length)+"</a>, ")
+        } 
+      )
+    }
+
+    function addNewShare() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const author = urlParams.get('author')
+      const dTag = urlParams.get('id')
+
+      let newPubKey = npub2hex($("#newPubkey").val())
+      sharingWith.add(newPubKey)
+      updateShares()
+
+      $("#newPubkey").val("")
+
+      const activeWorkbook = univerAPI.getActiveWorkbook()
+      const saveData = activeWorkbook.getSnapshot();
+
+      try { 
+        const data = convertUniverToDataArray(saveData)
+        saveSpreadSheet(author, dTag, Array.from(sharingWith), data)
+      } catch (e) {
+        console.log(e)
+      }
+    }
+
     async function loadId(author, dTag) {
-      fetchSpreadSheet(author, dTag, (name, data) => { 
+      sharingWith = new Set()
+
+      fetchSpreadSheet(author, dTag, (name, shares, data) => { 
         var {
           UniverCore,
           UniverDesign,
@@ -252,7 +311,7 @@
         univer.registerPlugin(UniverSheetsNumfmt.UniverSheetsNumfmtPlugin);
         univer.registerPlugin(UniverSheetsFormula.UniverSheetsFormulaPlugin);    
 
-        const univerAPI = UniverFacade.FUniver.newAPI(univer)
+        univerAPI = UniverFacade.FUniver.newAPI(univer)
 
         univerAPI.onCommandExecuted((command, options) => {
           // Only synchronize local mutations
@@ -265,14 +324,22 @@
 
           try { 
             const data = convertUniverToDataArray(saveData)
-            saveSpreadSheet(author, dTag, data)
+            saveSpreadSheet(author, dTag, Array.from(sharingWith), data)
           } catch (e) {
             console.log(e)
           }
         })
 
+        sharingWith = new Set()
+        shares.forEach(item => sharingWith.add(item))
+        updateShares()
+
         univer.createUniverSheet(convertDataArrayToUniver(name, data));
-      }, )
+      }, (pubkey, name) => { 
+        console.log("New Metatada", pubkey, name)
+        userNames.set(pubkey, name)
+        updateShares()
+      })
     }
   </script>
 </body>

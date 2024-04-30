@@ -52,18 +52,17 @@ function convertDataArrayToUniver(name, data) {
             let row = parseInt(rowColData[2]) - 1
             let col = UniverCore.ABCToNumber(rowColData[1])
 
-            let type = 1
-            let formula = undefined
-            let value = undefined
+            let cellData = {}
             if (rowColData[3][0] == "=") {
-                formula = rowColData[3]
+                cellData.f = rowColData[3]
             } else {
                 let valueClass = Number(rowColData[3]);
                 if (!isNaN(valueClass)) {
-                    value = parseFloat(rowColData[3])
-                    type = 2
+                    cellData.v = parseFloat(rowColData[3])
+                    cellData.t = 2
                 } else {
-                    value = rowColData[3]
+                    cellData.v = rowColData[3]
+                    cellData.t = 1
                 }
             }
 
@@ -83,11 +82,7 @@ function convertDataArrayToUniver(name, data) {
                 workbook.sheets[sheetName].cellData[row][col] = {}
             }
 
-            workbook.sheets[sheetName].cellData[row][col] = {
-                t: type,
-                v: value,
-                f: formula,
-            }
+            workbook.sheets[sheetName].cellData[row][col] = cellData
         }
         console.log("Openning", workbook)
 
