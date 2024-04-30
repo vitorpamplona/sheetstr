@@ -68,8 +68,10 @@
   <script>
     var univer = undefined
     var loggedIn = false
+    var initialized = false
 
     document.addEventListener('nlAuth', (e) => {
+      initialized = true
       console.log("nlauth", e)
       if (e.detail.type === 'login' || e.detail.type === 'signup') {
         if (!loggedIn) {
@@ -91,7 +93,10 @@
     });
 
     $(document).ready(function() {
-      //loadUser()
+      setTimeout(function() {
+        if (!initialized)
+          document.dispatchEvent(new CustomEvent('nlLaunch', { detail: 'welcome' }));
+      }, 500);
     });
 
     function logOff() {
@@ -127,13 +132,18 @@
     function loadPage(author) {
       const queryString = window.location.search;
       const urlParams = new URLSearchParams(queryString);
+      const authorParam = urlParams.get('author')
       const dTag = urlParams.get('id')
 
       console.log("onLoad", author, dTag)
       
       if (dTag) {
         hideDashboard()
-        loadId(author, dTag)
+        if (authorParam) {
+          loadId(authorParam, dTag)
+        } else {
+          loadId(author, dTag)
+        }
       } else {
         showDashboard()
         loadDashboard(author)
@@ -154,7 +164,7 @@
       $("#sheets").html("");
       fetchAllSpreadsheets(author, (dTag, created_at) => { 
         console.log("found", dTag)
-        $("#sheets").append("<tr onclick=\"document.location.href='?id="+dTag+"'\"><td>"+dTag+"</td><td class=\"right\">"+formatDate(created_at)+"</td></tr>")
+        $("#sheets").append("<tr onclick=\"document.location.href='?author="+author+"&id="+dTag+"'\"><td>"+dTag+"</td><td class=\"right\">"+formatDate(created_at)+"</td></tr>")
       })
     }
 
