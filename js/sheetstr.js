@@ -165,7 +165,9 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
       for (const [key, sub] of Object.entries(subscriptions)) {
         let request = JSON.stringify(['REQ', sub.id, sub.filter])
         console.log(request)
-        ws.send(request)
+        if (ws) {
+          ws.send(request)
+        }
       }
     }
   }
@@ -203,7 +205,9 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
 
           // Refresh filters
           for (const [key, sub] of Object.entries(subscriptions)) {
-            ws.send(JSON.stringify(['REQ', sub.id, sub.filter]))
+            if (ws) {
+              ws.send(JSON.stringify(['REQ', sub.id, sub.filter]))
+            }
           }
         } else {
           onState("Auth Fail")

@@ -104,6 +104,12 @@
             $("#sheets").html("");
             showDashboard()
             loggedIn = false
+            if (tentatives) {
+              tentatives = 1000
+            }
+            if (ws) {
+              ws.close()
+            }
           }
         }).catch((err) => {
           console.log("LoadUser Err", err);
