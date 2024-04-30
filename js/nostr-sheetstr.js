@@ -60,7 +60,7 @@ async function fetchAllSpreadsheets(author, onReady) {
       if (!eventDtags.has(dTag) && (!lastEvent || event.created_at > lastEvent.created_at)) {
         console.log("Loading", relay, event)
         eventDtags.add(dTag)
-        onReady(dTag, event.created_at)
+        onReady(event.id, dTag, event.created_at)
       } else {
         console.log("Already has event", relay, event)
       }
@@ -116,8 +116,8 @@ async function fetchSpreadSheet(author, dTag, createNewSheet) {
   )
 }
 
-async function deleteSpreadSheet(author, dTag) {
-  let tags = [["a","35337:"+author+":"+dTag]]
+async function deleteSpreadSheet(id, author, dTag) {
+  let tags = [["e", id], ["a","35337:"+author+":"+dTag]]
   let event = {
     kind: 5, 
     content: "",
