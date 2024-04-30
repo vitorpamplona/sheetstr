@@ -33,7 +33,6 @@ async function convertEventToDataArray(event) {
     // not logged in
   }
 
-
   return data
 }
 

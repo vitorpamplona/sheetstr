@@ -117,6 +117,8 @@
     });
 
     $(document).ready(function() {
+      showDashboard()
+      
       const authorParam = new URLSearchParams(window.location.search).get('author')
 
       if (authorParam && authorParam.length == 64) {
