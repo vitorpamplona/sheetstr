@@ -192,7 +192,9 @@
       if (window.nostr) {
         await deleteSpreadSheet(author, dTag)
       }
-      loadUser()
+      setTimeout(function() {
+        loadUser()
+      }, 500);
     }
 
     async function loadId(author, dTag) {
