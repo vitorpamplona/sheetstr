@@ -146,7 +146,11 @@
         }
       } else {
         showDashboard()
-        loadDashboard(author)
+        if (authorParam) {
+          loadDashboard(authorParam)
+        } else {
+          loadDashboard(author)
+        }
       }
     }
 

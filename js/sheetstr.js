@@ -116,7 +116,7 @@ async function fetchSpreadSheet(author, dTag, createNewSheet) {
   )
 }
 
-async function saveSpreadSheet(dTag, univerData) {
+async function saveSpreadSheet(author, dTag, univerData) {
   let event = await convertDataArrayToEvent(dTag, univerData)
   eventIds.add(event.id)
   lastEvent = event
