@@ -33,7 +33,7 @@
   <script src="js/jquery-3.6.2.min.js"></script>
   <script src="js/nostr-sign.js"></script>
   <script src="js/nostr-filter.js"></script>
-  <script src="js/sheetstr.js"></script>
+  <script src="js/nostr-sheetstr.js"></script>
   <script src="js/univer-utils.js"></script>
 
   <script src="https://www.unpkg.com/nostr-login@latest/dist/unpkg.js" data-perms="sign_event:35337,nip44_encrypt,nip44_decrypt"></script> 
@@ -130,8 +130,7 @@
     }
 
     function loadPage(author) {
-      const queryString = window.location.search;
-      const urlParams = new URLSearchParams(queryString);
+      const urlParams = new URLSearchParams(window.location.search);
       const authorParam = urlParams.get('author')
       const dTag = urlParams.get('id')
 
