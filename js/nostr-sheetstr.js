@@ -15,23 +15,12 @@ async function convertEventToDataArray(event) {
     let myPubKey = await window.nostr.getPublicKey()
     let ciphertext = event.tags.find(([k, v]) => k === "p" && v === myPubKey)[3]
   
-    console.log("cypher", ciphertext)
-  
     if (ciphertext) {
-      console.log("Secret", "1")
-
       let thisVersionsPrivateKeyInHex = await window.nostr.nip44.decrypt(event.pubkey, ciphertext)
       let thisVersionsPublicKeyHex = window.NostrTools.getPublicKey(hexToBytes(thisVersionsPrivateKeyInHex))
 
-      console.log("Secret", thisVersionsPrivateKeyInHex)
-
       let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(thisVersionsPrivateKeyInHex, thisVersionsPublicKeyHex)
-
-      console.log("Convesation Key", conversationKey)
-
-      let privateTags = window.NostrTools.nip44.v2.decrypt(event.content, conversationKey) 
-    
-      console.log("Private data", privateTags)
+      let privateTags = JSON.parse(window.NostrTools.nip44.v2.decrypt(event.content, conversationKey))
 
       for (tagData of privateTags) {
         if (tagData[0]== "data") {
@@ -52,8 +41,6 @@ async function convertDataArrayToEvent(dTag, shareWith, univerData) {
   let thisVersionsPrivateKey = window.NostrTools.generateSecretKey()
   let thisVersionsPublicKeyHex = window.NostrTools.getPublicKey(thisVersionsPrivateKey)
   let thisVersionsPrivateKeyInHex = bytesToHex(thisVersionsPrivateKey)
-
-  console.log("New keys", thisVersionsPrivateKey, thisVersionsPublicKeyHex)
 
   let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(thisVersionsPrivateKeyInHex, thisVersionsPublicKeyHex)
 
