@@ -21,10 +21,11 @@ async function convertEventToDataArray(event) {
       console.log("Secret", "1")
 
       let thisVersionsPrivateKeyInHex = await window.nostr.nip44.decrypt(event.pubkey, ciphertext)
+      let thisVersionsPublicKeyHex = window.NostrTools.getPublicKey(hexToBytes(thisVersionsPrivateKeyInHex))
 
       console.log("Secret", thisVersionsPrivateKeyInHex)
 
-      let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(thisVersionsPrivateKeyInHex, bytesToHex(thisVersionsPublicKey))
+      let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(thisVersionsPrivateKeyInHex, thisVersionsPublicKeyHex)
 
       console.log("Convesation Key", conversationKey)
 
