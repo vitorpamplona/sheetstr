@@ -15,13 +15,18 @@ async function convertEventToDataArray(event) {
     let myPubKey = await window.nostr.getPublicKey()
     let ciphertext = event.tags.find(([k, v]) => k === "p" && v === myPubKey)[3]
   
-    console.log("cyper", ciphertext)
+    console.log("cypher", ciphertext)
   
     if (ciphertext) {
       let thisVersionsPrivateKeyInHex = window.nostr.nip44.decrypt(event.pubkey, ciphertext)
       let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(thisVersionsPrivateKeyInHex, bytesToHex(thisVersionsPublicKey))
+
+      console.log("Convesation Key", conversationKey)
+
       let privateTags = window.NostrTools.nip44.v2.decrypt(event.content, conversationKey) 
     
+      console.log("Private data", privateTags)
+
       for (tagData of privateTags) {
         if (tagData[0]== "data") {
           console.log("Private data", tagData.slice[1])
