@@ -99,6 +99,7 @@
         window.nostr.getPublicKey().then(function (pubkey) {
           if (pubkey) {
             loggedIn = true
+            console.log("getPublicKey")
             loadPage(pubkey)
           } else {
             $("#sheets").html("");
