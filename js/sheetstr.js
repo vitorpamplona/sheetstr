@@ -128,7 +128,7 @@ async function saveSpreadSheet(dTag, univerData) {
 
 async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
   if (ws) {
-    if (ws.readyState <= 1)
+    if (ws.readyState <= 1) 
       ws.close()
 
     lastEvent = undefined
@@ -266,6 +266,8 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
       setTimeout(() => { observe(relay, filters, onState, onNewEvent, onOk, onEOSE) }, 150)
     }
     tentatives++
+
+    ws = undefined
   } 
 
   return ws
