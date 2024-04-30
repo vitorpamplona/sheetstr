@@ -183,12 +183,14 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
             ws.send(JSON.stringify(['AUTH', event]))
           } else {
             onState("Auth Fail")
-            ws.close(); 
+            if (ws)
+              ws.close(); 
           }
         },
         (reason) => {
           onState("Auth Fail")
-          ws.close(); 
+          if (ws)
+            ws.close(); 
         },
       ) 
     }
@@ -205,7 +207,8 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
           }
         } else {
           onState("Auth Fail")
-          ws.close(); 
+          if (ws)
+            ws.close(); 
         }
       } else {
         onOk(messageArray[1], messageArray[2], messageArray[3])
@@ -251,14 +254,15 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
       subState.done = true
     
       let alldone = Object.values(subscriptions).every(filter => filter.done === true);
-      if (alldone) {
+      if (alldone && ws) {
         ws.close(); 
       }
     }
   }
   ws.onerror = (err, event) => {
     console.log("WS Error", relay, err, event)
-    ws.close(); 
+    if (ws)
+      ws.close(); 
   }
   ws.onclose = (event) => {
     console.log("WS Close", relay, event)
