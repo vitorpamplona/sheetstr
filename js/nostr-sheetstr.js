@@ -175,15 +175,13 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
   }))
 
   // connected
-  ws.onopen = () => {
+  ws.onopen = (evt) => {
     if (Object.keys(subscriptions).length > 0) {
       onState("Querying")
       for (const [key, sub] of Object.entries(subscriptions)) {
         let request = JSON.stringify(['REQ', sub.id, sub.filter])
         console.log(request)
-        if (ws) {
-          ws.send(request)
-        }
+        evt.target.send(request)
       }
     }
   }
@@ -198,17 +196,15 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
       signNostrAuthEvent(relay, messageArray[1]).then(
         (event) => {
           if (event) {
-            ws.send(JSON.stringify(['AUTH', event]))
+            str.target.send(JSON.stringify(['AUTH', event]))
           } else {
             onState("Auth Fail")
-            if (ws)
-              ws.close(); 
+            str.target.close(); 
           }
         },
         (reason) => {
           onState("Auth Fail")
-          if (ws)
-            ws.close(); 
+          str.target.close(); 
         },
       ) 
     }
@@ -221,14 +217,11 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
 
           // Refresh filters
           for (const [key, sub] of Object.entries(subscriptions)) {
-            if (ws) {
-              ws.send(JSON.stringify(['REQ', sub.id, sub.filter]))
-            }
+            str.target.send(JSON.stringify(['REQ', sub.id, sub.filter]))
           }
         } else {
           onState("Auth Fail")
-          if (ws)
-            ws.close(); 
+          str.target.close(); 
         }
       } else {
         onOk(messageArray[1], messageArray[2], messageArray[3])
@@ -274,15 +267,14 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
       subState.done = true
     
       let alldone = Object.values(subscriptions).every(filter => filter.done === true);
-      if (alldone && ws) {
-        ws.close(); 
+      if (alldone) {
+        str.target.close(); 
       }
     }
   }
-  ws.onerror = (err, event) => {
-    console.log("WS Error", relay, err, event)
-    if (ws)
-      ws.close(); 
+  ws.onerror = (event) => {
+    console.log("WS Error", relay, event)
+    event.target.close(); 
   }
   ws.onclose = (event) => {
     console.log("WS Close", relay, event)
@@ -291,7 +283,8 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
     }
     tentatives++
 
-    ws = undefined
+    if (ws == event.target)
+      ws = undefined
   } 
 
   return ws
