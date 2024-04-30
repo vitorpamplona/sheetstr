@@ -24,7 +24,7 @@ async function convertEventToDataArray(event) {
 
       for (tagData of privateTags) {
         if (tagData[0]== "data") {
-          console.log("Private data", tagData.slice[1])
+          console.log("Private data", tagData)
           data.push(tagData.slice(1))
         }
       }
