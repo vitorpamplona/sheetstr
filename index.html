@@ -188,9 +188,9 @@
       return date.toLocaleString();
     }
 
-    function deleteEvent(author, dTag) {
+    async function deleteEvent(author, dTag) {
       if (window.nostr) {
-        deleteSpreadSheet(author, dTag)
+        await deleteSpreadSheet(author, dTag)
       }
       loadUser()
     }
