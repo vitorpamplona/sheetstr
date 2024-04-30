@@ -41,6 +41,10 @@ body {
   text-align: right;
 }
 
+.styled-table .center {
+  text-align: center;
+}
+
 .styled-table tbody tr {
   border-bottom: 1px solid #dddddd;
 }
@@ -79,12 +83,11 @@ button {
   cursor: pointer;
   display: inline-block;
   font-family: -apple-system, system-ui, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-  font-size: 14px;
+
   font-weight: 500;
-  line-height: 20px;
   list-style: none;
   margin: 0px;
-  padding: 5px 16px;
+  padding: 1px 5px;
   position: relative;
   transition: background-color 0.2s cubic-bezier(0.3, 0, 0.5, 1);
   user-select: none;
@@ -93,4 +96,10 @@ button {
   vertical-align: middle;
   white-space: nowrap;
   word-wrap: break-word;
+}
+
+#create-button {
+  font-size: 14px;
+  line-height: 20px;
+  padding: 5px 16px;
 }

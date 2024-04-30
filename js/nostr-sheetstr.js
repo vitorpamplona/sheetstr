@@ -116,6 +116,22 @@ async function fetchSpreadSheet(author, dTag, createNewSheet) {
   )
 }
 
+async function deleteSpreadSheet(author, dTag) {
+  let tags = [["a","35337:"+author+":"+dTag]]
+  let event = {
+    kind: 5, 
+    content: "",
+    tags: tags,
+  };
+
+  let evt = await nostrSign(event)
+  console.log(JSON.stringify(evt))
+
+  let eventStr = JSON.stringify(['EVENT', evt])
+  ws.send(eventStr)
+  console.log("Deleting Event", ws, eventStr)
+}
+
 async function saveSpreadSheet(author, dTag, univerData) {
   let event = await convertDataArrayToEvent(dTag, univerData)
   eventIds.add(event.id)

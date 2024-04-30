@@ -49,6 +49,7 @@
           <tr>
               <th>Name</th>
               <th class="right">Last Modified</th>
+              <th class="center">Actions</th>
           </tr>
       </thead>
       <tbody id="sheets">
@@ -58,7 +59,7 @@
 
     <div style="display: inline-block">
       <input type="text" style="float: left; margin-right: 5px;" class="cool-field" id="newDTag" name="newDTag" value="" placeholder="My cool new sheet">
-      <button id="fetch-and-broadcast" onclick="document.location.href='?id=' + $('#newDTag').val(); return false;">
+      <button id="create-button" onclick="document.location.href='?id=' + $('#newDTag').val(); return false;">
         Create
       </button>
     </div>
@@ -93,10 +94,16 @@
     });
 
     $(document).ready(function() {
-      setTimeout(function() {
-        if (!initialized)
-          document.dispatchEvent(new CustomEvent('nlLaunch', { detail: 'welcome' }));
-      }, 500);
+      const authorParam = new URLSearchParams(window.location.search).get('author')
+
+      if (authorParam && authorParam.length == 64) {
+        loadUser()
+      } else {
+        setTimeout(function() {
+          if (!initialized)
+            document.dispatchEvent(new CustomEvent('nlLaunch', { detail: 'welcome' }));
+        }, 500);
+      }
     });
 
     function logOff() {
@@ -112,12 +119,17 @@
     }
 
     function loadUser() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const authorParam = urlParams.get('author')
+
       console.log("loadUser")
-      if (window.nostr) {
+      if (authorParam) {
+        loggedIn = true
+        loadPage(authorParam)
+      } else if (window.nostr) {
         window.nostr.getPublicKey().then(function (pubkey) {
           if (pubkey) {
             loggedIn = true
-            console.log("getPublicKey")
             loadPage(pubkey)
           } else {
             logOff()
@@ -167,13 +179,20 @@
       $("#sheets").html("");
       fetchAllSpreadsheets(author, (dTag, created_at) => { 
         console.log("found", dTag)
-        $("#sheets").append("<tr onclick=\"document.location.href='?author="+author+"&id="+dTag+"'\"><td>"+dTag+"</td><td class=\"right\">"+formatDate(created_at)+"</td></tr>")
+        $("#sheets").append("<tr onclick=\"document.location.href='?author="+author+"&id="+dTag+"'\"><td>"+dTag+"</td><td class=\"right\">"+formatDate(created_at)+"</td><td class=\"center\"><button onclick=\"deleteEvent('"+author+"', '"+dTag+"');event.stopPropagation();\">Delete</button></td></tr>")
       })
     }
 
     function formatDate(unixtimestamp) {
       let date = new Date(unixtimestamp * 1000)
       return date.toLocaleString();
+    }
+
+    function deleteEvent(author, dTag) {
+      if (window.nostr) {
+        deleteSpreadSheet(author, dTag)
+      }
+      loadUser()
     }
 
     async function loadId(author, dTag) {
