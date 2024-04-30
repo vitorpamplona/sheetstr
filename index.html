@@ -73,6 +73,7 @@
       console.log("nlauth", e)
       if (e.detail.type === 'login' || e.detail.type === 'signup') {
         if (!loggedIn) {
+          console.log("Logging In")
           loggedIn = true
           setTimeout(function() {
             loadUser()
@@ -80,6 +81,7 @@
         }
       } else {
         if (loggedIn) {
+          console.log("Logging Off")
           loggedIn = false
           setTimeout(function() {
             loadUser()
