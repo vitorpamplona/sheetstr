@@ -251,7 +251,7 @@
           "<td>"+pubkeyObserver(ee.event.pubkey)+"</td>" +
           "<td>"+ee.team.map(it => pubkeyObserver(it)).join("")+"</td>" +
           "<td class=\"right\">"+formatDate(ee.event.created_at)+"</td>" +
-          "<td class=\"center\"></td>"+
+          "<td class=\"center\">"+deleteButton+"</td>"+
         "</tr>"
       )
     }
