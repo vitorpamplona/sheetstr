@@ -201,6 +201,8 @@
     async function loadDashboard(author) {
       $("#sheets").html("");
       fetchAllSpreadsheets(author, (ee) => {
+        console.log("Event Received", relay, ee)
+
         let currentVersion = expandedEvents.get(ee.address)
         if (currentVersion) {
           if (ee.event.created_at > currentVersion.event.created_at) {

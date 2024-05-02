@@ -184,7 +184,6 @@ async function fetchAllSpreadsheets(author, onReady, newUserMetadata) {
       console.log(relay, state)
     },
     async (event) => { 
-      console.log("Event Received", relay, event)
       if (event.kind == 0) {
         newUserMetadata(event.pubkey, JSON.parse(event.content))
       } else if (event.kind == 35337) {
@@ -266,7 +265,6 @@ async function fetchSpreadSheet(author, dTag, createNewSheet, newUserMetadata) {
       console.log(relay, state)
     },
     async (event) => { 
-      console.log("Event Received", relay, event)
       if (event.kind == 0) {
         newUserMetadata(event.pubkey, JSON.parse(event.content))
       } else if (event.kind == 35337) {
