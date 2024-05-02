@@ -296,7 +296,7 @@ async function fetchSpreadSheet(author, dTag, createNewSheet, newUserMetadata) {
       }
 
       if (eventIds.size == 0) {
-        createNewSheet(dTag, [])
+        createNewSheet(dTag, [], [])
       }
     }
   )
