@@ -339,6 +339,8 @@ async function saveSpreadSheet(author, dTag, shareWith, univerData) {
   eventIds.add(event.id)
   lastEvent = event
 
+  loadAllKeysFromSheet(event)
+
   let eventStr = JSON.stringify(['EVENT', event])
   ws.send(eventStr)
   console.log("Sending new Event", ws, eventStr)
