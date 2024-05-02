@@ -175,6 +175,8 @@ async function fetchAllSpreadsheets(author, onReady, newUserMetadata) {
 
   let subscriptions = createSubscriptions(filters)
 
+  console.log("Subs", subscriptions)
+
   await observe(
     relay, 
     subscriptions,
