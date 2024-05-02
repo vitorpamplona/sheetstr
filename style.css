@@ -1,4 +1,5 @@
 body {
+  font-family: sans-serif;
   margin: 0px;
 }
 
@@ -13,7 +14,6 @@ body {
   padding-bottom: 0px;
   margin-bottom: 0px;
   line-height: 1em;
-  font-family: sans-serif;
 }
 
 #dashboard {
@@ -22,7 +22,7 @@ body {
 }
 
 #app {
-  height: 100vh;
+  height: calc(100vh - 95px);
 }
 
 .styled-table {
@@ -40,9 +40,13 @@ body {
   text-align: left;
 }
 
-.styled-table th,
+.styled-table th {
+  padding: 12px 15px;
+}
+
 .styled-table td {
-    padding: 12px 15px;
+  height: 30px;
+  padding: 12px 15px;
 }
 
 .right {
@@ -79,6 +83,17 @@ body {
   box-sizing: border-box;
 }
 
+#shares {
+  vertical-align: middle;
+}
+
+p {
+  margin: 0px;
+}
+
+img{
+  vertical-align: middle;
+}
 
 button {
   appearance: none;
@@ -91,7 +106,6 @@ button {
   cursor: pointer;
   display: inline-block;
   font-family: -apple-system, system-ui, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-
   font-weight: 500;
   list-style: none;
   margin: 0px;

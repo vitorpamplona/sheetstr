@@ -33,7 +33,6 @@
   <script src="https://bundle.run/buffer@6.0.3"></script>
   <script src="https://bundle.run/bech32@2.0.0"></script>
 
-  <script src="https://unpkg.com/browse/@noble/secp256k1@2.1.0/index.js"></script>
   <script src="https://unpkg.com/nostr-tools/lib/nostr.bundle.js"></script>
 
   <script src="js/jquery-3.6.2.min.js"></script>
@@ -53,7 +52,9 @@
     <table class="styled-table">
       <thead>
           <tr>
-              <th>Name</th>
+              <th style="width: 45%;">Name</th>
+              <th>By</th>
+              <th>Team</th>
               <th class="right">Last Modified</th>
               <th class="center">Actions</th>
           </tr>
@@ -65,9 +66,7 @@
 
     <div style="display: inline-block">
       <input type="text" style="float: left; margin-right: 5px;" class="cool-field" id="newDTag" name="newDTag" value="" placeholder="My cool new sheet">
-      <button id="create-button" onclick="document.location.href='?id=' + $('#newDTag').val(); return false;">
-        Create
-      </button>
+      <button id="create-button" onclick="document.location.href='?id=' + $('#newDTag').val(); return false;">Create</button>
     </div>
   </div>
   <div id="app-container">
@@ -75,11 +74,8 @@
       <h2 id="sheet-name">Your Public Spreadsheets</h2>
       <p>Shared with: <span id="shares"></span>      
         <input type="text" style="margin-right:3px;" class="cool-field" id="newPubkey" name="newPubkey" value="" placeholder="Add npub">
-        <button id="create-button" style="margin-bottom: 1px;" onclick="addNewShare()">
-          Share
-        </button>
+        <button id="create-button" style="margin-bottom: 1px;" onclick="addNewShare()">Share</button>
       </p>
-
     </header>
     <div id="app"></div>
   </div>
@@ -91,6 +87,7 @@
     var loggedIn = false
     var initialized = false
 
+    var expandedEvents = new Map()
     var userNames = new Map()
     var sharingWith = new Set()
 
@@ -203,10 +200,58 @@
 
     async function loadDashboard(author) {
       $("#sheets").html("");
-      fetchAllSpreadsheets(author, (id, dTag, created_at) => { 
-        console.log("found", dTag)
-        $("#sheets").append("<tr onclick=\"document.location.href='?author="+author+"&id="+dTag+"'\"><td>"+dTag+"</td><td class=\"right\">"+formatDate(created_at)+"</td><td class=\"center\"><button onclick=\"deleteEvent('"+id+"', '"+author+"', '"+dTag+"');event.stopPropagation();\">Delete</button></td></tr>")
+      fetchAllSpreadsheets(author, (ee) => {
+        let currentVersion = expandedEvents.get(ee.address)
+        if (currentVersion) {
+          if (ee.event.created_at > currentVersion.event.created_at) {
+            console.log("New version of ", ee.address)
+            expandedEvents.set(ee.address, ee)
+            addOrReplaceSheetLine(ee)
+          }
+        } else {
+          console.log("New Sheet", ee.address)
+          expandedEvents.set(ee.address, ee)
+          addOrReplaceSheetLine(ee)
+        }
+      }, (pubkey, metadata) => { 
+        console.log("New Metatada", pubkey, metadata)
+        userNames.set(pubkey, metadata)
+        updatePubkeyObservables()
       })
+    }
+
+    function updatePubkeyObservables() {
+      console.log("UpdatePubkeyObservables")
+      $(".pubkey-observer").each(function () {
+        let obj = $(this)
+        obj.html(getNameOrShortenKey(obj.attr('id')))
+      })
+    }
+
+    function pubkeyObserver(pubkey) {
+      return "<a href=\"?author="+pubkey+"\" id='" + pubkey + "' class='pubkey-observer'>" + getNameOrShortenKey(pubkey) + "</a>"
+    }
+
+    function addOrReplaceSheetLine(ee) {
+      let id = sha256Hex(ee.address)
+      if ($(id).length) {
+        $(id).remove();
+      }
+
+      let deleteButton = ""
+      if (ee.canEdit) {
+        deleteButton = "<button onclick=\"deleteEvent('"+ee.address+"');event.stopPropagation();\">Delete</button>"
+      }
+
+      $("#sheets").append(
+        "<tr id='"+ id +"' onclick=\"document.location.href='?author="+ee.event.pubkey+"&id="+ee.dTag+"'\">" +
+          "<td>"+ee.title+"</td>" +
+          "<td>"+pubkeyObserver(ee.event.pubkey)+"</td>" +
+          "<td>"+ee.team.map(it => pubkeyObserver(it)).join("")+"</td>" +
+          "<td class=\"right\">"+formatDate(ee.event.created_at)+"</td>" +
+          "<td class=\"center\"></td>"+
+        "</tr>"
+      )
     }
 
     function formatDate(unixtimestamp) {
@@ -214,25 +259,43 @@
       return date.toLocaleString();
     }
 
-    async function deleteEvent(id, author, dTag) {
-      if (window.nostr) {
-        await deleteSpreadSheet(id, author, dTag)
+    async function deleteEvent(address) {
+      let event = events.get(address)
+      if (event) {
+        if (window.nostr) {
+          await deleteSpreadSheet(event)
+        }
+        setTimeout(function() {
+          loadUser()
+        }, 500);
       }
-      setTimeout(function() {
-        loadUser()
-      }, 500);
     }
 
     function updateShares() {
       let component = $("#shares")
       component.html("")
       sharingWith.forEach((pubkey) => { 
-        if (userNames.has(pubkey)) 
-          component.append("<a href=\"?author="+pubkey+"\">"+userNames.get(pubkey)+"</a>, ")
-        else 
-          component.append("<a href=\"?author="+pubkey+"\">"+pubkey.substring(0, 6)+".."+pubkey.substring(pubkey.length-6, pubkey.length)+"</a>, ")
-        } 
-      )
+        component.append(pubkeyObserver(pubkey) + "")
+      })
+    }
+
+    function getNameOrShortenKey(pubkey) {
+      if (userNames.has(pubkey)) {
+        let metadata = userNames.get(pubkey)
+        if (metadata.picture) {
+          return "<img style=\"border-radius: 50%;\" width=\"30\" height=\"30\" src='" + metadata.picture + "'/>"
+        } else if (metadata.display_name) {
+          return metadata.display_name
+        } else {
+          return metadata.name
+        }
+      } else {
+        return pubkey.substring(0, 2)
+      } 
+    }
+
+    function shorten(str) {
+      return str.substring(0, 6)+".."+str.substring(str.length-6, str.length)
     }
 
     function addNewShare() {
@@ -338,10 +401,10 @@
         updateShares()
 
         univer.createUniverSheet(convertDataArrayToUniver(name, data));
-      }, (pubkey, name) => { 
-        console.log("New Metatada", pubkey, name)
-        userNames.set(pubkey, name)
-        updateShares()
+      }, (pubkey, metadata) => { 
+        console.log("New Metatada", pubkey, metadata)
+        userNames.set(pubkey, metadata)
+        updatePubkeyObservables()
       })
     }
   </script>

@@ -2,6 +2,7 @@ var ws = undefined
 var eventIds = new Set()
 var lastEvent = undefined
 var tentatives = 0
+var userMetatada = new Map()
 
 async function convertEventToDataArray(event) {
   let data = []
@@ -11,29 +12,107 @@ async function convertEventToDataArray(event) {
       data.push(tagData.slice(1))
   }
 
+  let privateTags = await decryptPrivateTags(event)
+
+  if (privateTags) {
+    for (tagData of privateTags) {
+      if (tagData[0]== "data") {
+        console.log("Private data", tagData)
+        data.push(tagData.slice(1))
+      }
+    }
+  }
+
+  return data
+}
+
+async function decryptSharedPrivateKey(event) {
   try {
     let myPubKey = await window.nostr.getPublicKey()
     let ciphertext = event.tags.find(([k, v]) => k === "p" && v === myPubKey)[3]
   
     if (ciphertext) {
-      let thisVersionsPrivateKeyInHex = await window.nostr.nip44.decrypt(event.pubkey, ciphertext)
-      let thisVersionsPublicKeyHex = window.NostrTools.getPublicKey(hexToBytes(thisVersionsPrivateKeyInHex))
-
-      let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(thisVersionsPrivateKeyInHex, thisVersionsPublicKeyHex)
-      let privateTags = JSON.parse(window.NostrTools.nip44.v2.decrypt(event.content, conversationKey))
-
-      for (tagData of privateTags) {
-        if (tagData[0]== "data") {
-          console.log("Private data", tagData)
-          data.push(tagData.slice(1))
-        }
-      }
+      return await window.nostr.nip44.decrypt(event.pubkey, ciphertext)
     } 
   } catch (e) {
     // not logged in
+    return undefined
+  }
+}
+
+async function decryptPrivateTags(thisVersionsPrivateKeyInHex, event) {
+  try {
+    if (thisVersionsPrivateKeyInHex) {
+      let thisVersionsPublicKeyHex = window.NostrTools.getPublicKey(hexToBytes(thisVersionsPrivateKeyInHex))
+
+      let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(thisVersionsPrivateKeyInHex, thisVersionsPublicKeyHex)
+      return JSON.parse(window.NostrTools.nip44.v2.decrypt(event.content, conversationKey))
+    } else {
+      return undefined
+    }
+  } catch (e) {
+    // not logged in
+    return undefined
+  }
+}
+
+async function decryptPrivateTags(event) {
+  try {
+    let thisVersionsPrivateKeyInHex = await decryptSharedPrivateKey(event)
+    
+    if (thisVersionsPrivateKeyInHex) {
+      await decryptPrivateTags(thisVersionsPrivateKeyInHex, event)
+    } else {
+      return undefined
+    }
+  } catch (e) {
+    // not logged in
+    return undefined
+  }
+}
+
+async function expandEvent(event) {
+  let dTag = event.tags.find(([k, v]) => k === "d")[1]
+  let team = event.tags.filter(([k, v]) => k === "p").map(it => it[1])
+  
+  let loggedIn = undefined
+  if (window.nostr) { 
+    loggedIn = await window.nostr.getPublicKey()
   }
 
-  return data
+  let publicTitleTag = event.tags.find(([k, v]) => k === "title")
+  let sharedPrivateKeyHex = await decryptSharedPrivateKey(event)
+  let sharedPublicKeyHex = undefined
+  if (sharedPrivateKeyHex) {
+    sharedPublicKeyHex = window.NostrTools.getPublicKey(hexToBytes(sharedPrivateKeyHex))
+  }
+  let privateTags = await decryptPrivateTags(sharedPrivateKeyHex, event)
+  let privateSignerPubKeyTag = undefined
+  let privateTitleTag = undefined
+  if (privateTags) {
+    privateTitleTag = privateTags.find(([k, v]) => k === "title")
+    privateSignerPubKeyTag = privateTags.find(([k, v]) => k === "signer")
+  }
+  let title = dTag
+  if (publicTitleTag) {
+    title = publicTitleTag[1]
+  }
+  if (privateTitleTag) {
+    title = privateTitleTag[1]
+  }
+
+  return {
+    event: event, 
+    dTag: dTag,
+    address: event.kind + ":" + event.pubkey + ":" + dTag,
+    title: title,
+    privateTags: privateTags, 
+    sharedPrivateKeyHex: sharedPrivateKeyHex,
+    declaredSignerPubKey: undefined,
+    team: team,
+    hasPrivateCells: privateTags != undefined,
+    canEdit: event.pubkey == loggedIn || event.pubkey == sharedPublicKeyHex,
+  }
 }
 
 async function convertDataArrayToEvent(dTag, shareWith, univerData) {
@@ -72,37 +151,43 @@ async function convertDataArrayToEvent(dTag, shareWith, univerData) {
   return evt
 }
 
-async function fetchAllSpreadsheets(author, onReady) {
+async function fetchAllSpreadsheets(author, onReady, newUserMetadata) {
   tentatives = 0
   let relay = "wss://nostr.mom"
+
+  addUserMetadataIfItDoesntExist(author)
 
   let filters = [
     {
       "authors":[author],
       "kinds":[35337],
       "limit":200
+    }, 
+    {
+      "#p":[author],
+      "kinds":[35337],
+      "limit":200
+    }, {
+      "authors": Array.from(userMetatada.keys()),
+      "kinds":[0]
     }
   ]
 
-  var eventDtags = new Set()
+  let subscriptions = createSubscriptions(filters)
 
   await observe(
     relay, 
-    filters,
+    subscriptions,
     (state) => {
       console.log(relay, state)
     },
-    (event) => { 
+    async (event) => { 
       console.log("Event Received", relay, event)
-
-      let dTag = event.tags.find(([k, v]) => k === "d")[1]
-
-      if (!eventDtags.has(dTag) && (!lastEvent || event.created_at > lastEvent.created_at)) {
-        console.log("Loading", relay, event)
-        eventDtags.add(dTag)
-        onReady(event.id, dTag, event.created_at)
-      } else {
-        console.log("Already has event", relay, event)
+      if (event.kind == 0) {
+        newUserMetadata(event.pubkey, JSON.parse(event.content))
+      } else if (event.kind == 35337) {
+        loadAllKeysFromSheet(event)
+        onReady(await expandEvent(event))
       }
     }, 
     (eventId, inserted, message) => {
@@ -110,42 +195,84 @@ async function fetchAllSpreadsheets(author, onReady) {
     },
     () => {
       console.log("EOSE", relay)
+
+      if (subscriptions["MYSUB2"].filter.authors.length != userMetatada.size) {
+        subscriptions["MYSUB2"].filter = {
+          "authors": Array.from(userMetatada.keys()),
+          "kinds":[0]
+        }
+        updateSubscriptions(ws, subscriptions)
+      }
     }
   )
 }
 
-async function fetchSpreadSheet(author, dTag, createNewSheet, newAuthorMetadata) {
+function createSubscriptions(filters) {
+  return Object.fromEntries(filters.map ( (filter, index) => {
+    let id = "MYSUB"+index
+    return [ 
+      id, {
+        id: id,
+        counter: 0,
+        eoseSessionCounter: 0,
+        okCounter: 0,
+        lastEvent: undefined,
+        done: false,
+        filter: { ...filter },
+        eventIds: new Set()
+      }
+    ]
+  }))
+}
+
+function loadAllKeysFromSheet(event) {
+  [event.pubkey, ...event.tags.filter(([k, v]) => k === "p").map(([k, v]) => v)].forEach(key => {
+    addUserMetadataIfItDoesntExist(key)
+  })
+}
+
+function addUserMetadataIfItDoesntExist(pubkey) {
+  if (!userMetatada.has(pubkey)) {
+    userMetatada.set(pubkey, undefined)
+  }
+}
+
+async function fetchSpreadSheet(author, dTag, createNewSheet, newUserMetadata) {
   tentatives = 0
   let relay = "wss://nostr.mom"
 
-  let filters = [
+  addUserMetadataIfItDoesntExist(author)
+
+  const filters = [
     {
       "authors":[author],
       "kinds":[35337],
       "#d":[dTag],
       "limit":1
     }, {
-      "authors":[author],
+      "authors": Array.from(userMetatada.keys()),
       "kinds":[0]
     }
   ]
 
+  let subscriptions = createSubscriptions(filters)
+
   await observe(
     relay, 
-    filters,
+    subscriptions,
     (state) => {
       console.log(relay, state)
     },
     async (event) => { 
       console.log("Event Received", relay, event)
       if (event.kind == 0) {
-        newAuthorMetadata(event.pubkey, JSON.parse(event.content).name)
+        newUserMetadata(event.pubkey, JSON.parse(event.content))
       } else if (event.kind == 35337) {
-        let shares = [event.pubkey, ...event.tags.filter(([k, v]) => k === "p").map(([k, v]) => v)]
-
         if (!eventIds.has(event.id) && (!lastEvent || event.created_at > lastEvent.created_at)) {
           console.log("Loading", relay, event)
           eventIds.add(event.id)
+          loadAllKeysFromSheet(event)
+          let shares = [event.pubkey, ...event.tags.filter(([k, v]) => k === "p").map(([k, v]) => v)]
           createNewSheet(dTag, shares, await convertEventToDataArray(event))
         } else {
           console.log("Already has event", relay, event)
@@ -158,6 +285,14 @@ async function fetchSpreadSheet(author, dTag, createNewSheet, newAuthorMetadata)
     () => {
       console.log("EOSE", relay)
 
+      if (subscriptions["MYSUB1"].filter.authors.length != userMetatada.size) {
+        subscriptions["MYSUB1"].filter = {
+          "authors": Array.from(userMetatada.keys()),
+          "kinds":[0]
+        }
+        updateSubscriptions(ws, subscriptions)
+      }
+
       if (eventIds.size == 0) {
         createNewSheet(dTag, [])
       }
@@ -165,20 +300,36 @@ async function fetchSpreadSheet(author, dTag, createNewSheet, newAuthorMetadata)
   )
 }
 
-async function deleteSpreadSheet(id, author, dTag) {
-  let tags = [["e", id], ["a","35337:"+author+":"+dTag]]
+async function deleteSpreadSheet(expandEvent) {
   let event = {
     kind: 5, 
+    created_at: Math.floor(Date.now() / 1000),
     content: "",
-    tags: tags,
+    tags: [["e", expandEvent.event.id], ["a",expandEvent.address]],
   };
 
-  let evt = await nostrSign(event)
-  console.log(JSON.stringify(evt))
+  let loggedInUser = window.nostr.getPublicKey()
 
-  let eventStr = JSON.stringify(['EVENT', evt])
-  ws.send(eventStr)
-  console.log("Deleting Event", ws, eventStr)
+  if (loggedInUser == expandEvent.event.pubkey) {
+    let evt = await nostrSign(event)
+    console.log(JSON.stringify(evt))
+  
+    let eventStr = JSON.stringify(['EVENT', evt])
+    ws.send(eventStr)
+    console.log("Deleting Event", ws, eventStr)
+  } else if (expandEvent.sharedPrivateKeyHex) {
+    // if it has a valid shared key for this event. 
+    let privateKeyBytes = hexToBytes(expandEvent.sharedPrivateKeyHex)
+    let eventSharedPubKey = window.NostrTools.getPublicKey(privateKeyBytes)
+    if (expandEvent.event.pubkey == eventSharedPubKey) {
+      let evt = window.NostrTools.finalizeEvent(event, privateKeyBytes)
+      console.log(JSON.stringify(evt))
+  
+      let eventStr = JSON.stringify(['EVENT', evt])
+      ws.send(eventStr)
+      console.log("Deleting Event using shared key", ws, eventStr)
+    }
+  }
 }
 
 async function saveSpreadSheet(author, dTag, shareWith, univerData) {
@@ -191,7 +342,17 @@ async function saveSpreadSheet(author, dTag, shareWith, univerData) {
   console.log("Sending new Event", ws, eventStr)
 }
 
-async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
+function updateSubscriptions(websocket, subscriptions) {
+  if (Object.keys(subscriptions).length > 0) {
+    for (const [key, sub] of Object.entries(subscriptions)) {
+      let request = JSON.stringify(['REQ', sub.id, sub.filter])
+      console.log(request)
+      websocket.send(request)
+    }
+  }
+}
+
+async function observe(relay, subscriptions, onState, onNewEvent, onOk, onEOSE) {
   if (ws) {
     if (ws.readyState <= 1) 
       ws.close()
@@ -207,31 +368,11 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
 
   onState("Starting")
 
-  const subscriptions = Object.fromEntries(filters.map ( (filter, index) => {
-    let id = "MYSUB"+index
-    return [ 
-      id, {
-        id: id,
-        counter: 0,
-        eoseSessionCounter: 0,
-        okCounter: 0,
-        lastEvent: undefined,
-        done: false,
-        filter: { ...filter },
-        eventIds: new Set()
-      }
-    ]
-  }))
-
   // connected
   ws.onopen = (evt) => {
     if (Object.keys(subscriptions).length > 0) {
       onState("Querying")
-      for (const [key, sub] of Object.entries(subscriptions)) {
-        let request = JSON.stringify(['REQ', sub.id, sub.filter])
-        console.log(request)
-        evt.target.send(request)
-      }
+      updateSubscriptions(evt.target, subscriptions)
     }
   }
 
@@ -328,7 +469,7 @@ async function observe(relay, filters, onState, onNewEvent, onOk, onEOSE) {
   ws.onclose = (event) => {
     console.log("WS Close", relay, event)
     if (tentatives > 5) {
-      setTimeout(() => { observe(relay, filters, onState, onNewEvent, onOk, onEOSE) }, 150)
+      setTimeout(() => { observe(relay, subscriptions, onState, onNewEvent, onOk, onEOSE) }, 150)
     }
     tentatives++
 
