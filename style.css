@@ -8,6 +8,12 @@ body {
   font-family: sans-serif;
 }
 
+#footer {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  font-family: sans-serif;
+}
+
 #mini-header {
   padding-top: 5px;
   padding-left: 10px;
@@ -32,6 +38,11 @@ body {
   font-family: sans-serif;
   min-width: 948px;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+}
+
+.simple-table {
+  border-collapse: collapse;
+  font-family: sans-serif;
 }
 
 .styled-table thead tr {
@@ -124,4 +135,22 @@ button {
   font-size: 14px;
   line-height: 20px;
   padding: 5px 16px;
+}
+
+.spanAnon{
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-image: url('img/anon.jpeg');
+  background-repeat: no-repeat;
+  background-size: 30px 30px;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 30px;
+  display: inline-block;
+  margin: 0px;
+  padding: 0px;
+  vertical-align: middle;
+  padding-top: 2px;
 }

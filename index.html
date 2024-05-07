@@ -47,14 +47,15 @@
 <body>
   <div id="dashboard">
     <header id="header" class="center">
-      <h1>Your Public Spreadsheets</h1>
+      <h1>Your Spreadsheets</h1>
     </header>
     <table class="styled-table">
       <thead>
           <tr>
               <th style="width: 45%;">Name</th>
               <th>By</th>
-              <th>Team</th>
+              <th>View</th>
+              <th>Edit</th>
               <th class="right">Last Modified</th>
               <th class="center">Actions</th>
           </tr>
@@ -65,17 +66,44 @@
     </table>
 
     <div style="display: inline-block">
-      <input type="text" style="float: left; margin-right: 5px;" class="cool-field" id="newDTag" name="newDTag" value="" placeholder="My cool new sheet">
-      <button id="create-button" onclick="document.location.href='?id=' + $('#newDTag').val(); return false;">Create</button>
+      <!--input type="text" style="float: left; margin-right: 5px;" class="cool-field" id="newName" name="newName" value="" placeholder="My cool new sheet" -->
+      <button id="create-button" onclick="document.location.href='?id=' + generateUUID(); return false;">Create</button>
     </div>
+
+    <footer id="footer" class="center">
+      <p class="text-xs text-gray-500">Made with <span class="text-red-500">💜</span> from Amethyst. Source Code: <a href="https://github.com/vitorpamplona/sheetstr">GitHub</a></p>
+    </footer>
   </div>
   <div id="app-container">
     <header id="mini-header">
-      <h2 id="sheet-name">Your Public Spreadsheets</h2>
-      <p>Shared with: <span id="shares"></span>      
-        <input type="text" style="margin-right:3px;" class="cool-field" id="newPubkey" name="newPubkey" value="" placeholder="Add npub">
-        <button id="create-button" style="margin-bottom: 1px;" onclick="addNewShare()">Share</button>
-      </p>
+      <h2 id="sheet-name" onclick="toggleNameEdit(this);">Your Spreadsheets</h2>
+      <table class="simple-table">
+        <tr>
+          <td>
+            Viewers:
+          </td>  
+          <td>
+            <span id="shares-view"></span>   
+          </td>
+          <td>
+            <input type="text" style="margin-right:3px;" class="cool-field" id="newPubkeyView" name="newPubkeyView" value="" placeholder="Add npub">
+            <button id="create-button" style="margin-bottom: 1px;" onclick="addNewViewShare()">Share</button>
+          </td>
+          <td>
+            <input type="checkbox" id="public-view" name="public-view" onclick="toggleMakeItPublic(this.checked);" />
+            Make it public
+          </td>
+        </tr>
+        <tr>
+          <td>Editors:</td>
+          <td><span id="shares-edit"></span></td>
+          <td>
+            <input type="text" style="margin-right:3px;" class="cool-field" id="newPubkeyEdit" name="newPubkeyEdit" value="" placeholder="Add npub">
+            <button id="create-button" style="margin-bottom: 1px;" onclick="addNewEditShare()">Share</button>
+          </td>
+          <td></td>
+        </tr>
+      </table>      
     </header>
     <div id="app"></div>
   </div>
@@ -89,7 +117,8 @@
 
     var expandedEvents = new Map()
     var userNames = new Map()
-    var sharingWith = new Set()
+    var showingEvent = undefined
+    var hasWarnedAboutOffline = false
 
     document.addEventListener('nlAuth', (e) => {
       initialized = true
@@ -121,6 +150,7 @@
       if (authorParam && authorParam.length == 64) {
         loadUser()
       } else {
+        console.log("Force Welcome Login")
         setTimeout(function() {
           if (!initialized)
             document.dispatchEvent(new CustomEvent('nlLaunch', { detail: 'welcome' }));
@@ -141,10 +171,13 @@
     }
 
     function loadUser() {
+      expandedEvents = new Map()
+      hasWarnedAboutOffline = false
+      showingEvent = undefined
+
       const urlParams = new URLSearchParams(window.location.search);
       const authorParam = urlParams.get('author')
 
-      console.log("loadUser")
       if (authorParam) {
         loggedIn = true
         loadPage(authorParam)
@@ -168,7 +201,7 @@
       const authorParam = urlParams.get('author')
       const dTag = urlParams.get('id')
 
-      console.log("onLoad", author, dTag)
+      console.log("Load page for", author, dTag)
       
       if (dTag) {
         $("#sheet-name").html(dTag)
@@ -245,11 +278,19 @@
         deleteButton = "<button onclick=\"deleteEvent('"+ee.address+"');event.stopPropagation();\">Delete</button>"
       }
 
+      let teamArray = Array.from(ee.team.values())
+
+      let view = "Public"
+      if (!ee.isPublic) {
+        view = teamArray.filter(it => it.canView && it.pubkey != ee.event.pubkey).map(it => pubkeyObserver(it.pubkey)).join("")
+      }
+
       $("#sheets").append(
         "<tr id='"+ id +"' onclick=\"document.location.href='?author="+ee.event.pubkey+"&id="+ee.dTag+"'\">" +
-          "<td>"+ee.title+"</td>" +
-          "<td>"+pubkeyObserver(ee.event.pubkey)+"</td>" +
-          "<td>"+ee.team.map(it => pubkeyObserver(it)).join("")+"</td>" +
+          "<td>"+ ee.title + "</td>" +
+          "<td>"+ pubkeyObserver(ee.event.pubkey) + "</td>" +
+          "<td>"+ view + "</td>" +
+          "<td>"+teamArray.filter(it => it.canEdit && it.pubkey != ee.event.pubkey).map(it => pubkeyObserver(it.pubkey)).join("")+"</td>" +
           "<td class=\"right\">"+formatDate(ee.event.created_at)+"</td>" +
           "<td class=\"center\">"+deleteButton+"</td>"+
         "</tr>"
@@ -262,10 +303,10 @@
     }
 
     async function deleteEvent(address) {
-      let event = events.get(address)
-      if (event) {
+      let ee = expandedEvents.get(address)
+      if (ee) {
         if (window.nostr) {
-          await deleteSpreadSheet(event)
+          await deleteSpreadSheet(ee)
         }
         setTimeout(function() {
           loadUser()
@@ -274,10 +315,31 @@
     }
 
     function updateShares() {
-      let component = $("#shares")
-      component.html("")
-      sharingWith.forEach((pubkey) => { 
-        component.append(pubkeyObserver(pubkey) + "")
+      let view = $("#shares-view")
+      view.html("")
+
+      if (showingEvent.title)
+        $("#sheet-name").html(showingEvent.title)
+      else 
+        $("#sheet-name").html(showingEvent.dTag)
+
+      if (showingEvent.isPublic) {
+        view.html(" Public")
+        $("#public-view").attr("checked", 'Checked')
+      } else {
+        showingEvent.team.forEach((member, key) => { 
+          if (member.canView) {
+            view.append(pubkeyObserver(member.pubkey) + "")
+          }
+        })
+      }
+
+      let edit = $("#shares-edit")
+      edit.html("")
+      showingEvent.team.forEach((member, key) => { 
+        if (member.canEdit) {
+          edit.append(pubkeyObserver(member.pubkey) + "")
+        }
       })
     }
 
@@ -287,12 +349,12 @@
         if (metadata.picture) {
           return "<img style=\"border-radius: 50%;\" width=\"30\" height=\"30\" src='" + metadata.picture + "'/>"
         } else if (metadata.display_name) {
-          return metadata.display_name
+          return "<span class='spanAnon'>"+metadata.display_name.substring(0, 2)+"</span>"
         } else {
-          return metadata.name
+          return "<span class='spanAnon'>"+metadata.name.substring(0, 2)+"</span>"
         }
       } else {
-        return pubkey.substring(0, 2)
+        return "<span class='spanAnon'>"+pubkey.substring(0, 2)+"</span>"
       } 
     }
 
@@ -300,32 +362,79 @@
       return str.substring(0, 6)+".."+str.substring(str.length-6, str.length)
     }
 
-    function addNewShare() {
+    function addNewViewShare() {
+      let newPubKey = npub2hex($("#newPubkeyView").val())
+
+      if (!showingEvent.team.has(newPubKey)) {
+        showingEvent.team.set(newPubKey, { pubkey: newPubKey, canView: true, canEdit: false })
+      }
+      
+      updateShares()
+
+      $("#newPubkeyView").val("")
+
+      saveEvent()
+    }
+
+
+    function toggleMakeItPublic(newIsPublic) {
+      showingEvent.isPublic = newIsPublic
+      updateShares()
+      saveEvent()
+    }
+
+    function toggleNameEdit(target) {
+      console.log("ToggleNameEdit")
+      var title = showingEvent.title;
+      $(target).html('');
+      $('<input></input>')
+          .attr({
+              'type': 'text',
+              'class': 'cool-field',
+              'id': 'txt_title',
+              'size': '40',
+              'value': title
+          })
+          .on( "focusout", function() {
+            showingEvent.title = $("#txt_title").val()
+            saveEvent()
+            $('#sheet-name').text(showingEvent.title);
+          } )
+          .on("click", function(event) {
+            event.stopPropagation();
+          })
+          .appendTo('#sheet-name');
+      $('#txt_title').focus();
+    }
+
+    function addNewEditShare() {
+      let newPubKey = npub2hex($("#newPubkeyEdit").val())
+      showingEvent.team.set(newPubKey, { pubkey: newPubKey, canView: true, canEdit: true })
+      updateShares()
+
+      $("#newPubkeyView").val("")
+
+      saveEvent()
+    }
+
+    function saveEvent() {
       const urlParams = new URLSearchParams(window.location.search);
       const author = urlParams.get('author')
       const dTag = urlParams.get('id')
-
-      let newPubKey = npub2hex($("#newPubkey").val())
-      sharingWith.add(newPubKey)
-      updateShares()
-
-      $("#newPubkey").val("")
 
       const activeWorkbook = univerAPI.getActiveWorkbook()
       const saveData = activeWorkbook.getSnapshot();
 
       try { 
         const data = convertUniverToDataArray(saveData)
-        saveSpreadSheet(author, dTag, Array.from(sharingWith), data)
+        saveSpreadSheet(showingEvent, data)
       } catch (e) {
         console.log(e)
       }
     }
 
     async function loadId(author, dTag) {
-      sharingWith = new Set()
-
-      fetchSpreadSheet(author, dTag, (name, shares, data) => { 
+      fetchSpreadSheet(author, dTag, (ee, data) => { 
         var {
           UniverCore,
           UniverDesign,
@@ -386,21 +495,40 @@
           if (command.type !== 2 || options?.fromCollab || options?.onlyLocal || command.id === 'doc.mutation.rich-text-editing' || command.id === 'sheet.mutation.set-worksheet-row-auto-height') {
             return;
           }
-          
-          const activeWorkbook = univerAPI.getActiveWorkbook()
-          const saveData = activeWorkbook.getSnapshot();
 
-          try { 
-            const data = convertUniverToDataArray(saveData)
-            saveSpreadSheet(author, dTag, Array.from(sharingWith), data)
-          } catch (e) {
-            console.log(e)
+          if (showingEvent.canEdit) {
+            const activeWorkbook = univerAPI.getActiveWorkbook()
+            const saveData = activeWorkbook.getSnapshot();
+
+            try { 
+              const data = convertUniverToDataArray(saveData)
+              saveSpreadSheet(showingEvent, data)
+            } catch (e) {
+              console.log(e)
+            }
+          } else {
+            if (!hasWarnedAboutOffline) {
+              alert("You are not logged in. Changes to this spreadsheet are not being saved.")
+              hasWarnedAboutOffline = true
+            }
           }
         })
 
-        sharingWith = new Set()
-        shares.forEach(item => sharingWith.add(item))
+        console.log("Loading Spreadsheet", ee, data)
+
+        showingEvent = ee
+
         updateShares()
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const author = urlParams.get('author')
+        if (author !== ee.event.pubkey) {
+          urlParams.set("author", ee.event.pubkey);
+          //window.location.search = urlParams.toString();
+
+          var newRelativePathQuery = window.location.pathname + '?' + urlParams.toString();
+          history.pushState(null, '', newRelativePathQuery);
+        }
 
         univer.createUniverSheet(convertDataArrayToUniver(name, data));
       }, (pubkey, metadata) => { 

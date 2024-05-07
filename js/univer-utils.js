@@ -30,7 +30,7 @@ function convertUniverToDataArray(saveData) {
 function convertDataArrayToUniver(name, data) {
     console.log("Load from", name, data)
 
-    if (data.length === 0) {
+    if (data && data.length === 0) {
         return {}
     } else {
         let workbook = {

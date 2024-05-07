@@ -4,15 +4,13 @@ var lastEvent = undefined
 var tentatives = 0
 var userMetatada = new Map()
 
-async function convertEventToDataArray(event) {
+async function convertEventToDataArray(tags, privateTags) {
   let data = []
 
-  for (tagData of event.tags) {
+  for (tagData of tags) {
     if (tagData[0]== "data")
       data.push(tagData.slice(1))
   }
-
-  let privateTags = await decryptPrivateTags(event)
 
   if (privateTags) {
     for (tagData of privateTags) {
@@ -26,9 +24,18 @@ async function convertEventToDataArray(event) {
   return data
 }
 
-async function decryptSharedPrivateKey(event) {
+async function decryptMySharedPrivateKey(event) {
   try {
     let myPubKey = await window.nostr.getPublicKey()
+    decryptMySharedPrivateKey(myPubKey, event)
+  } catch (e) {
+    // not logged in
+    return undefined
+  }
+}
+
+async function decryptMySharedPrivateKey(myPubKey, event) {
+  try {
     let ciphertext = event.tags.find(([k, v]) => k === "p" && v === myPubKey)[3]
   
     if (ciphertext) {
@@ -40,13 +47,98 @@ async function decryptSharedPrivateKey(event) {
   }
 }
 
-async function decryptPrivateTags(thisVersionsPrivateKeyInHex, event) {
+function decryptOthersPrivateKey(mySharedPrivateKey, targetPubKey, ciphertext) {      
+  try {
+    let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(mySharedPrivateKey, targetPubKey)
+    return window.NostrTools.nip44.v2.decrypt(ciphertext, conversationKey)
+  } catch (e) {
+    // not logged in
+    return undefined
+  }
+}
+
+async function teamPermissions(event) {
+  await teamPermissions(event, await decryptMySharedPrivateKey(event))
+}
+
+async function teamPermissions(event, mySharedPrivateKeyHex) {
+  if (mySharedPrivateKeyHex) {
+    let sharedPublicKeyHex = window.NostrTools.getPublicKey(hexToBytes(mySharedPrivateKeyHex))
+    if (event.pubkey == sharedPublicKeyHex) {
+      // the shared key I have is the author of the event. I can decrypt all members. 
+      let team = event.tags.filter(([k, v]) => k === "p").map(it => {
+        let privateKeyToThisPerson = decryptOthersPrivateKey(mySharedPrivateKeyHex, it[1], it[3])
+        if (privateKeyToThisPerson == mySharedPrivateKeyHex) {
+          return {
+            pubkey: it[1],
+            canEdit: true, 
+            canView: true,
+          }
+        } else {
+          return {
+            pubkey: it[1],
+            canEdit: false, 
+            canView: true,
+          }
+        }
+      })
+
+      if (team.find(member => member.pubkey == event.pubkey)) {
+        // if has owner
+        return team
+      } else {
+        // adds the owner
+        return [
+          {
+            pubkey: event.pubkey,
+            canEdit: true, 
+            canView: true,
+          },
+          ...team
+        ]
+      }
+    } 
+  }
+   
+  let team =  event.tags.filter(([k, v]) => k === "p").map(it => {
+    if (it[1] == event.pubkey) {
+      return {
+        pubkey: it[1],
+        canEdit: true, 
+        canView: true,
+      }
+    } else {
+      return {
+        pubkey: it[1],
+        canEdit: false, 
+        canView: true,
+      }
+    }
+  })
+
+  if (team.find(member => member.pubkey == event.pubkey)) {
+    // if has owner
+    return team
+  } else {
+    // adds the owner
+    return [
+      {
+        pubkey: event.pubkey,
+        canEdit: true, 
+        canView: true,
+      },
+      ...team
+    ]
+  }
+}
+
+
+async function decryptPrivateTags(thisVersionsPrivateKeyInHex, thisVersionsPublicKeyHex, ciphertext) {
+  if (ciphertext === "") return undefined
   try {
     if (thisVersionsPrivateKeyInHex) {
-      let thisVersionsPublicKeyHex = window.NostrTools.getPublicKey(hexToBytes(thisVersionsPrivateKeyInHex))
-
       let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(thisVersionsPrivateKeyInHex, thisVersionsPublicKeyHex)
-      return JSON.parse(window.NostrTools.nip44.v2.decrypt(event.content, conversationKey))
+      return JSON.parse(window.NostrTools.nip44.v2.decrypt(ciphertext, conversationKey))
     } else {
       return undefined
     }
@@ -56,12 +148,19 @@ async function decryptPrivateTags(thisVersionsPrivateKeyInHex, event) {
   }
 }
 
-async function decryptPrivateTags(event) {
+async function decryptViewKey(editKeyInHex, event) {
   try {
-    let thisVersionsPrivateKeyInHex = await decryptSharedPrivateKey(event)
-    
-    if (thisVersionsPrivateKeyInHex) {
-      await decryptPrivateTags(thisVersionsPrivateKeyInHex, event)
+    if (editKeyInHex) {
+      let keyList = event.tags.filter(([k, v]) => k === "p").map(it => {
+        let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(editKeyInHex, it[1])
+        return window.NostrTools.nip44.v2.decrypt(it[3], conversationKey)
+      }).filter(it => it !== editKeyInHex)
+
+      if (keyList.length > 0) {
+        return keyList[0]
+      } else {
+        return undefined
+      }
     } else {
       return undefined
     }
@@ -73,26 +172,105 @@ async function decryptPrivateTags(event) {
 
 async function expandEvent(event) {
   let dTag = event.tags.find(([k, v]) => k === "d")[1]
-  let team = event.tags.filter(([k, v]) => k === "p").map(it => it[1])
-  
+  let publicTitleTag = event.tags.find(([k, v]) => k === "title")
+
   let loggedIn = undefined
   if (window.nostr) { 
-    loggedIn = await window.nostr.getPublicKey()
+    try {
+      loggedIn = await window.nostr.getPublicKey()
+    } catch (e) {
+
+    }
   }
 
-  let publicTitleTag = event.tags.find(([k, v]) => k === "title")
-  let sharedPrivateKeyHex = await decryptSharedPrivateKey(event)
-  let sharedPublicKeyHex = undefined
-  if (sharedPrivateKeyHex) {
-    sharedPublicKeyHex = window.NostrTools.getPublicKey(hexToBytes(sharedPrivateKeyHex))
+  let myPrivateKeyHex = undefined
+  let myPublicKeyHex = undefined
+
+  let editPrivateKeyHex = undefined
+  let viewPrivateKeyHex = undefined
+
+  let privateTags = undefined
+  let editKeyIsLoggedIn = false
+
+  if (loggedIn) {
+    myPrivateKeyHex = await decryptMySharedPrivateKey(loggedIn, event)
+
+    console.log("Private", myPrivateKeyHex)
+
+    // was granted a private key
+    // figure out if it is to encrypt or decrypt
+    if (myPrivateKeyHex) {
+      // if the public key of the secret is the same as the event.pubkey, 
+      myPublicKeyHex = window.NostrTools.getPublicKey(hexToBytes(myPrivateKeyHex))
+      if (event.pubkey == myPublicKeyHex) {
+        // I have edit permissions.
+        editPrivateKeyHex = myPrivateKeyHex
+        // Let's check if there is a separate key for the viewing permissions. 
+
+        try {
+          viewPrivateKeyHex = await decryptViewKey(editPrivateKeyHex, event)
+        } catch (e) {
+          console.log("err 1", dTag)
+        }
+
+        if (viewPrivateKeyHex) {
+          console.log("Has Separate View Key", dTag)
+          viewPublicKeyHex = window.NostrTools.getPublicKey(hexToBytes(viewPrivateKeyHex))
+
+          // uses my private key to decrypt 
+          try {
+            privateTags = await decryptPrivateTags(myPrivateKeyHex, viewPublicKeyHex, event.content)
+          } catch (e) {
+            console.log("err 2", dTag)
+          }
+        } else {
+          try {
+            privateTags = await decryptPrivateTags(myPrivateKeyHex, event.pubkey, event.content)
+          } catch (e) {
+            console.log("err 3", dTag)
+          }
+        }
+      } else {
+        // I don't have edit permissions. 
+        // I can't decrypt the other keys. 
+        // just mark kas view. 
+        viewPrivateKeyHex = myPrivateKeyHex
+
+        if (loggedIn == event.pubkey) {
+          editKeyIsLoggedIn = true
+
+          try {
+            privateTags = JSON.parse(await window.nostr.nip44.decrypt(myPublicKeyHex, event.content))
+          } catch (e) {
+            console.log("err 4", dTag)
+            privateTags = await decryptPrivateTags(myPrivateKeyHex, event.pubkey, event.content)
+          }
+        } else {
+          try {
+            privateTags = await decryptPrivateTags(myPrivateKeyHex, event.pubkey, event.content)
+          } catch (e) {
+            console.log("err 5", dTag)
+          }
+        }
+      }
+    } else if (loggedIn == event.pubkey) {
+      // This event has been signed by the main key
+      editKeyIsLoggedIn = true
+
+      try {
+        privateTags = JSON.parse(await window.nostr.nip44.decrypt(event.pubkey, event.content))
+      } catch (e) {
+        console.log("err 6", dTag)
+      }
+    }
   }
-  let privateTags = await decryptPrivateTags(sharedPrivateKeyHex, event)
-  let privateSignerPubKeyTag = undefined
+
   let privateTitleTag = undefined
   if (privateTags) {
+    console.log(privateTags)
     privateTitleTag = privateTags.find(([k, v]) => k === "title")
-    privateSignerPubKeyTag = privateTags.find(([k, v]) => k === "signer")
   }
+
   let title = dTag
   if (publicTitleTag) {
     title = publicTitleTag[1]
@@ -101,54 +279,193 @@ async function expandEvent(event) {
     title = privateTitleTag[1]
   }
 
+  let team = await teamPermissions(event, myPrivateKeyHex)
+  let teamMap = new Map()
+  team.forEach(it => {
+    let current = teamMap.get(it.pubkey)
+    if (!current || it.canEdit)
+      teamMap.set(it.pubkey, it)
+  })
+
   return {
     event: event, 
     dTag: dTag,
     address: event.kind + ":" + event.pubkey + ":" + dTag,
     title: title,
     privateTags: privateTags, 
-    sharedPrivateKeyHex: sharedPrivateKeyHex,
-    declaredSignerPubKey: undefined,
-    team: team,
-    hasPrivateCells: privateTags != undefined,
-    canEdit: event.pubkey == loggedIn || event.pubkey == sharedPublicKeyHex,
+    editPrivateKeyHex: editPrivateKeyHex,
+    viewPrivateKeyHex: viewPrivateKeyHex,
+    editKeyIsLoggedIn: editKeyIsLoggedIn,
+    team: teamMap,
+    canEdit: editPrivateKeyHex != null || editKeyIsLoggedIn,
+    isPublic: hasDataTags(event)
   }
 }
 
-async function convertDataArrayToEvent(dTag, shareWith, univerData) {
-  let thisVersionsPrivateKey = window.NostrTools.generateSecretKey()
-  let thisVersionsPublicKeyHex = window.NostrTools.getPublicKey(thisVersionsPrivateKey)
-  let thisVersionsPrivateKeyInHex = bytesToHex(thisVersionsPrivateKey)
-
-  let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(thisVersionsPrivateKeyInHex, thisVersionsPublicKeyHex)
-
-  let tags = [
-    ["d",dTag], 
-    ["alt","A spreadsheet"]
-  ]
-  for (pubkey of shareWith) {
-    tags.push(["p", pubkey, "", await window.nostr.nip44.encrypt(pubkey, thisVersionsPrivateKeyInHex)])
-  }
-  for (tagData of univerData) {
-    tags.push(["data", ...tagData])
+async function convertDataArrayToEvent(expandedEvent, univerData) {
+  // user is readonly
+  if (!(expandedEvent.editKeyIsLoggedIn || expandedEvent.editPrivateKeyHex)) {
+    console.log("Cant create an event: user is not logged in or it is readonly")
+    return
   }
 
-  let privateTags = []
-  for (tagData of univerData) {
-    privateTags.push(["data", ...tagData])
-  }
+  let teamArray = Array.from(expandedEvent.team.values())
 
-  let content = window.NostrTools.nip44.v2.encrypt(JSON.stringify(privateTags), conversationKey) 
+  let tags = []
+  let content = ""
+  let oldPrivateTags = expandedEvent.privateTags
+  if (!oldPrivateTags)
+    oldPrivateTags = []
+
+  if (expandedEvent.isPublic) {
+    console.log("Saving as public spreadsheet")
+    // saves all data in public tags
+    // no view permissions
+    // saves edit permissions, if any
+    tags = [...expandedEvent.event.tags.filter(it => it[0] != "p" && it[0] != "data" && it[0] != "title"), ...oldPrivateTags.filter(it => it[0] != "p" && it[0] != "data")]
+    
+    // load updated data
+    for (tagData of univerData) {
+      tags.push(["data", ...tagData])
+    }
+
+    if (expandedEvent.title) {
+      tags.push(["title", expandedEvent.title])
+    }
+
+    for (member of teamArray) {
+      if (member.canEdit) {
+        let editPrivateKeyHex = expandedEvent.editPrivateKeyHex
+        if (!editPrivateKeyHex) {
+          editPrivateKeyHex = bytesToHex(window.NostrTools.generateSecretKey())
+        }
+
+        if (expandedEvent.editKeyIsLoggedIn) {
+          tags.push(["p", member.pubkey, "", await window.nostr.nip44.encrypt(member.pubkey, editPrivateKeyHex)])
+        } else {
+          let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(editPrivateKeyHex, member.pubkey)
+          tags.push(["p", member.pubkey, "", window.NostrTools.nip44.v2.encrypt(editPrivateKeyHex, conversationKey) ])
+        }
+      }
+    }
+  } else {
+    // not public
+    tags = [...expandedEvent.event.tags.filter(it => it[0] != "data" && it[0] != "p" && it[0] != "title")]
+    let privateTags = [...oldPrivateTags.filter(it => it[0] != "d" && it[0] != "p" && it[0] != "data" && it[0] != "title" )]
+
+    if (expandedEvent.title) {
+      privateTags.push(["title", expandedEvent.title])
+    }
+
+    // load updated data
+    for (tagData of univerData) {
+      privateTags.push(["data", ...tagData])
+    }  
+
+    if (expandedEvent.editKeyIsLoggedIn) {
+      console.log("Saving as logged in user")
+      // saves all data in private tags
+      // adds view permissions
+      // only the author can edit
+
+      let viewPrivateKeyHex = expandedEvent.viewPrivateKeyHex
+      if (!viewPrivateKeyHex) {
+        viewPrivateKeyHex = bytesToHex(window.NostrTools.generateSecretKey())
+      }
+      let viewPublicKeyHex = window.NostrTools.getPublicKey(hexToBytes(viewPrivateKeyHex))
+
+      for (member of teamArray) {
+        if (member.canView) {
+          tags.push(["p", member.pubkey, "", await window.nostr.nip44.encrypt(member.pubkey, viewPrivateKeyHex)])
+        }
+      }
+
+      content = await window.nostr.nip44.encrypt(viewPublicKeyHex, JSON.stringify(privateTags))
+    } else {
+      console.log("Saving with edit keys", expandedEvent.editPrivateKeyHex, window.NostrTools.getPublicKey(hexToBytes(expandedEvent.editPrivateKeyHex)))
+      // saves all data in private tags
+      // adds view permissions
+      // adds edit permissions
+
+      let editPrivateKeyHex = expandedEvent.editPrivateKeyHex
+      if (!editPrivateKeyHex) {
+        editPrivateKeyHex = bytesToHex(window.NostrTools.generateSecretKey())
+      }
+      let editPublicKeyHex = window.NostrTools.getPublicKey(hexToBytes(editPrivateKeyHex))
+
+      let viewPrivateKeyHex = expandedEvent.viewPrivateKeyHex
+      if (!viewPrivateKeyHex) {
+        viewPrivateKeyHex = bytesToHex(window.NostrTools.generateSecretKey())
+      }
+      let viewPublicKeyHex = window.NostrTools.getPublicKey(hexToBytes(viewPrivateKeyHex))
+
+      let hasView = false
+
+      for (member of teamArray) {
+        if (member.canEdit) {
+          let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(editPrivateKeyHex, member.pubkey)
+          tags.push(["p", member.pubkey, "", window.NostrTools.nip44.v2.encrypt(editPrivateKeyHex, conversationKey) ])
+        } else if (member.canView) {
+          let conversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(editPrivateKeyHex, member.pubkey)
+          tags.push(["p", member.pubkey, "", window.NostrTools.nip44.v2.encrypt(viewPrivateKeyHex, conversationKey) ])
+          hasView = true
+        }
+      }
+
+      if (hasView) {
+        let contentConversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(editPrivateKeyHex, viewPublicKeyHex)
+        content = window.NostrTools.nip44.v2.encrypt(JSON.stringify(privateTags), contentConversationKey) 
+      } else {
+        let contentConversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(editPrivateKeyHex, editPublicKeyHex)
+        content = window.NostrTools.nip44.v2.encrypt(JSON.stringify(privateTags), contentConversationKey) 
+      }
+    }
+  }
 
   let event = {
     kind: 35337, 
+    created_at: Math.floor((new Date()).getTime() / 1000),
     content: content,
     tags: tags,
   };
 
-  let evt = await nostrSign(event)
-  console.log(JSON.stringify(evt))
-  return evt
+  if (expandedEvent.editKeyIsLoggedIn) {
+    return await nostrSign(event)
+  } else if (expandedEvent.editPrivateKeyHex) {
+    return window.NostrTools.finalizeEvent(event, hexToBytes(expandedEvent.editPrivateKeyHex))
+  }
+}
+
+async function blankPrivateSheet(dTag) {
+  let me = await window.nostr.getPublicKey()
+
+  if (me) {
+    let editPrivateKey = window.NostrTools.generateSecretKey()
+    let editPublicKey = window.NostrTools.getPublicKey(editPrivateKey)
+    let editPrivateKeyHex = bytesToHex(editPrivateKey)
+  
+    let contentConversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(editPrivateKeyHex, editPublicKey)
+    let content = window.NostrTools.nip44.v2.encrypt(JSON.stringify([]), contentConversationKey) 
+
+    let pTagConversationKey = window.NostrTools.nip44.v2.utils.getConversationKey(editPrivateKeyHex, me)
+
+    let tags = [
+      ["d", dTag], 
+      ["alt","A spreadsheet"],
+      ["p", me, "", window.NostrTools.nip44.v2.encrypt(editPrivateKeyHex, pTagConversationKey)]
+    ]
+  
+    let event = {
+      kind: 35337, 
+      created_at: Math.floor((new Date()).getTime() / 1000),
+      content: content,
+      tags: tags,
+    };
+  
+    let evt = window.NostrTools.finalizeEvent(event, editPrivateKey)
+    console.log("Blank Sheet", JSON.stringify(evt))
+    return evt
+  }
 }
 
 async function fetchAllSpreadsheets(author, onReady, newUserMetadata) {
@@ -175,13 +492,13 @@ async function fetchAllSpreadsheets(author, onReady, newUserMetadata) {
 
   let subscriptions = createSubscriptions(filters)
 
-  console.log("Subs", subscriptions)
+  console.log("Fetch All using subs", subscriptions)
 
   await observe(
     relay, 
     subscriptions,
     (state) => {
-      console.log(relay, state)
+      console.log("OnState", relay, state)
     },
     async (event) => { 
       if (event.kind == 0) {
@@ -238,6 +555,10 @@ function addUserMetadataIfItDoesntExist(pubkey) {
   }
 }
 
+function hasDataTags(event) {
+  return event.tags.find(tag => tag[0] == "data") != undefined
+}
+
 async function fetchSpreadSheet(author, dTag, createNewSheet, newUserMetadata) {
   tentatives = 0
   let relay = "wss://nostr.mom"
@@ -262,7 +583,7 @@ async function fetchSpreadSheet(author, dTag, createNewSheet, newUserMetadata) {
     relay, 
     subscriptions,
     (state) => {
-      console.log(relay, state)
+      console.log("OnState", relay, state)
     },
     async (event) => { 
       if (event.kind == 0) {
@@ -272,8 +593,9 @@ async function fetchSpreadSheet(author, dTag, createNewSheet, newUserMetadata) {
           console.log("Loading", relay, event)
           eventIds.add(event.id)
           loadAllKeysFromSheet(event)
-          let shares = [event.pubkey, ...event.tags.filter(([k, v]) => k === "p").map(([k, v]) => v)]
-          createNewSheet(dTag, shares, await convertEventToDataArray(event))
+
+          let expandedEvent = await expandEvent(event)
+          createNewSheet(expandedEvent, await convertEventToDataArray(event.tags, expandedEvent.privateTags))
         } else {
           console.log("Already has event", relay, event)
         }
@@ -281,8 +603,16 @@ async function fetchSpreadSheet(author, dTag, createNewSheet, newUserMetadata) {
     }, 
     (eventId, inserted, message) => {
       console.log("Event Ack", relay, eventId, inserted, message)
+
+      if (subscriptions["MYSUB1"].filter.authors.length != userMetatada.size) {
+        subscriptions["MYSUB1"].filter = {
+          "authors": Array.from(userMetatada.keys()),
+          "kinds":[0]
+        }
+        updateSubscriptions(ws, subscriptions)
+      } 
     },
-    () => {
+    async (subscription) => {
       console.log("EOSE", relay)
 
       if (subscriptions["MYSUB1"].filter.authors.length != userMetatada.size) {
@@ -293,38 +623,37 @@ async function fetchSpreadSheet(author, dTag, createNewSheet, newUserMetadata) {
         updateSubscriptions(ws, subscriptions)
       }
 
-      if (eventIds.size == 0) {
-        createNewSheet(dTag, [], [])
+      if (subscription.id == "MYSUB0" && eventIds.size == 0) {
+        createNewSheet(await expandEvent(await blankPrivateSheet(dTag)), [])
       }
     }
   )
 }
 
-async function deleteSpreadSheet(expandEvent) {
+async function deleteSpreadSheet(expandedEvent) {
   let event = {
     kind: 5, 
     created_at: Math.floor(Date.now() / 1000),
     content: "",
-    tags: [["e", expandEvent.event.id], ["a",expandEvent.address]],
+    tags: [["e", expandedEvent.event.id], ["a",expandedEvent.address]],
   };
 
-  let loggedInUser = window.nostr.getPublicKey()
+  let loggedInUser = await window.nostr.getPublicKey()
 
-  if (loggedInUser == expandEvent.event.pubkey) {
+  console.log("Deleting", event)
+
+  if (loggedInUser == expandedEvent.event.pubkey) {
     let evt = await nostrSign(event)
-    console.log(JSON.stringify(evt))
-  
     let eventStr = JSON.stringify(['EVENT', evt])
     ws.send(eventStr)
     console.log("Deleting Event", ws, eventStr)
-  } else if (expandEvent.sharedPrivateKeyHex) {
+  } else if (expandedEvent.editPrivateKeyHex) {
     // if it has a valid shared key for this event. 
-    let privateKeyBytes = hexToBytes(expandEvent.sharedPrivateKeyHex)
+    let privateKeyBytes = hexToBytes(expandedEvent.editPrivateKeyHex)
     let eventSharedPubKey = window.NostrTools.getPublicKey(privateKeyBytes)
-    if (expandEvent.event.pubkey == eventSharedPubKey) {
-      let evt = window.NostrTools.finalizeEvent(event, privateKeyBytes)
-      console.log(JSON.stringify(evt))
-  
+
+    if (expandedEvent.event.pubkey == eventSharedPubKey) {
+      let evt = window.NostrTools.finalizeEvent(event, privateKeyBytes)  
       let eventStr = JSON.stringify(['EVENT', evt])
       ws.send(eventStr)
       console.log("Deleting Event using shared key", ws, eventStr)
@@ -332,8 +661,8 @@ async function deleteSpreadSheet(expandEvent) {
   }
 }
 
-async function saveSpreadSheet(author, dTag, shareWith, univerData) {
-  let event = await convertDataArrayToEvent(dTag, shareWith, univerData)
+async function saveSpreadSheet(expandedEvent, univerData) {
+  let event = await convertDataArrayToEvent(expandedEvent, univerData)
   eventIds.add(event.id)
   lastEvent = event
 
@@ -347,9 +676,7 @@ async function saveSpreadSheet(author, dTag, shareWith, univerData) {
 function updateSubscriptions(websocket, subscriptions) {
   if (Object.keys(subscriptions).length > 0) {
     for (const [key, sub] of Object.entries(subscriptions)) {
-      let request = JSON.stringify(['REQ', sub.id, sub.filter])
-      console.log(request)
-      websocket.send(request)
+      websocket.send(JSON.stringify(['REQ', sub.id, sub.filter]))
     }
   }
 }
@@ -448,7 +775,11 @@ async function observe(relay, subscriptions, onState, onNewEvent, onOk, onEOSE) 
 
     if (msgType === 'EOSE') {
       const subState = subscriptions[messageArray[1]]
-      onEOSE()
+      onEOSE(subState)
+    }
+
+    if (msgType === 'NOTICE') {
+      console.log("Notice", messageArray)
     }
 
     if (msgType === 'CLOSED') {
@@ -493,4 +824,20 @@ async function signNostrAuthEvent(relay, auth_challenge) {
   };
 
   return await nostrSign(event)
+}
+
+function generateUUID() { // Public Domain/MIT
+  var d = new Date().getTime();//Timestamp
+  var d2 = ((typeof performance !== 'undefined') && performance.now && (performance.now()*1000)) || 0;//Time in microseconds since page-load or 0 if unsupported
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16;//random number between 0 and 16
+      if(d > 0){//Use timestamp until depleted
+          r = (d + r)%16 | 0;
+          d = Math.floor(d/16);
+      } else {//Use microseconds since page-load if supported
+          r = (d2 + r)%16 | 0;
+          d2 = Math.floor(d2/16);
+      }
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
 }
