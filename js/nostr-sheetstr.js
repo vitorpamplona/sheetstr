@@ -1,3 +1,5 @@
+const SHEET_KIND = 35337
+
 var ws = undefined
 var eventIds = new Set()
 var lastEvent = undefined
@@ -423,7 +425,7 @@ async function convertDataArrayToEvent(expandedEvent, univerData) {
   }
 
   let event = {
-    kind: 35337, 
+    kind: SHEET_KIND, 
     created_at: Math.floor((new Date()).getTime() / 1000),
     content: content,
     tags: tags,
@@ -456,7 +458,7 @@ async function blankPrivateSheet(dTag) {
     ]
   
     let event = {
-      kind: 35337, 
+      kind: SHEET_KIND, 
       created_at: Math.floor((new Date()).getTime() / 1000),
       content: content,
       tags: tags,
@@ -476,12 +478,12 @@ async function fetchAllSpreadsheets(relay, author, onReady, newUserMetadata) {
   let filters = [
     {
       "authors":[author],
-      "kinds":[35337],
+      "kinds":[SHEET_KIND],
       "limit":200
     }, 
     {
       "#p":[author],
-      "kinds":[35337],
+      "kinds":[SHEET_KIND],
       "limit":200
     }, {
       "authors": Array.from(userMetatada.keys()),
@@ -502,7 +504,7 @@ async function fetchAllSpreadsheets(relay, author, onReady, newUserMetadata) {
     async (event) => { 
       if (event.kind == 0) {
         newUserMetadata(event.pubkey, JSON.parse(event.content))
-      } else if (event.kind == 35337) {
+      } else if (event.kind == SHEET_KIND) {
         loadAllKeysFromSheet(event)
         onReady(await expandEvent(event))
       }
@@ -566,7 +568,7 @@ async function fetchSpreadSheet(relay, author, dTag, createNewSheet, newUserMeta
   const filters = [
     {
       "authors":[author],
-      "kinds":[35337],
+      "kinds":[SHEET_KIND],
       "#d":[dTag],
       "limit":1
     }, {
@@ -586,7 +588,7 @@ async function fetchSpreadSheet(relay, author, dTag, createNewSheet, newUserMeta
     async (event) => { 
       if (event.kind == 0) {
         newUserMetadata(event.pubkey, JSON.parse(event.content))
-      } else if (event.kind == 35337) {
+      } else if (event.kind == SHEET_KIND) {
         if (!eventIds.has(event.id) && (!lastEvent || event.created_at > lastEvent.created_at)) {
           console.log("Loading", relay, event)
           eventIds.add(event.id)
