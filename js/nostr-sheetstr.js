@@ -470,7 +470,7 @@ async function blankPrivateSheet(dTag) {
 
 async function fetchAllSpreadsheets(author, onReady, newUserMetadata) {
   tentatives = 0
-  let relay = "wss://nos.lol"
+  let relay = "wss://nostr.mom"
 
   addUserMetadataIfItDoesntExist(author)
 
@@ -561,7 +561,7 @@ function hasDataTags(event) {
 
 async function fetchSpreadSheet(author, dTag, createNewSheet, newUserMetadata) {
   tentatives = 0
-  let relay = "wss://nos.lol"
+  let relay = "wss://nostr.mom"
 
   addUserMetadataIfItDoesntExist(author)
 
