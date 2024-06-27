@@ -206,7 +206,7 @@
       if (!relay) {
         relay = "wss://nostr.mom"
         urlParams.set("relay", relay);
-        history.replaceState(null, '', window.location.pathname + '?' + urlParams.toString());
+        history.replaceState(null, '', window.location.pathname + '?' + decodeURIComponent(urlParams.toString()));
       }
 
       console.log("Load page for", relay, author, dTag)
@@ -529,8 +529,7 @@
           urlParams.set("author", ee.event.pubkey);
           //window.location.search = urlParams.toString();
 
-          var newRelativePathQuery = window.location.pathname + '?' + urlParams.toString();
-          history.replaceState(null, '', newRelativePathQuery);
+          history.replaceState(null, '', window.location.pathname + '?' + decodeURIComponent(urlParams.toString()));
         }
 
         univer.createUniverSheet(convertDataArrayToUniver(name, data));
