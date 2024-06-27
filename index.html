@@ -27,6 +27,7 @@
   <!-- Replace with the URL of your larger image -->
   <meta property="og:url" content="https://sheetstr.amethyst.social">
 
+  <script src="https://unpkg.com/@univerjs/umd/lib/locale/en-US.js"></script>
   <script src="https://unpkg.com/@univerjs/umd/lib/univer.full.umd.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/@univerjs/umd/lib/univer.css">
 
@@ -467,13 +468,7 @@
           theme: UniverDesign.defaultTheme,
           locale: UniverCore.LocaleType.EN_US,
           locales: {
-            [UniverCore.LocaleType.EN_US]: {
-              ...UniverSheets.enUS,
-              ...UniverDocsUi.enUS,
-              ...UniverSheetsUi.enUS,
-              ...UniverUi.enUS,
-              ...UniverDesign.enUS,
-            },
+            [UniverCore.LocaleType.EN_US]: UniverUMD['en-US'],
           },
         });
 
