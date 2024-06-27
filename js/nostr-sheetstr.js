@@ -468,9 +468,8 @@ async function blankPrivateSheet(dTag) {
   }
 }
 
-async function fetchAllSpreadsheets(author, onReady, newUserMetadata) {
+async function fetchAllSpreadsheets(relay, author, onReady, newUserMetadata) {
   tentatives = 0
-  let relay = "wss://nostr.mom"
 
   addUserMetadataIfItDoesntExist(author)
 
@@ -559,9 +558,8 @@ function hasDataTags(event) {
   return event.tags.find(tag => tag[0] == "data") != undefined
 }
 
-async function fetchSpreadSheet(author, dTag, createNewSheet, newUserMetadata) {
+async function fetchSpreadSheet(relay, author, dTag, createNewSheet, newUserMetadata, ) {
   tentatives = 0
-  let relay = "wss://nostr.mom"
 
   addUserMetadataIfItDoesntExist(author)
 

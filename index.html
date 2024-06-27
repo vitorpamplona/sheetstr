@@ -200,23 +200,30 @@
       const urlParams = new URLSearchParams(window.location.search);
       const authorParam = urlParams.get('author')
       const dTag = urlParams.get('id')
+      let relay = urlParams.get('relay')
 
-      console.log("Load page for", author, dTag)
+      if (!relay) {
+        relay = "wss://nostr.mom"
+        urlParams.set("relay", relay);
+        history.pushState(null, '', window.location.pathname + '?' + urlParams.toString());
+      }
+
+      console.log("Load page for", relay, author, dTag)
       
       if (dTag) {
         $("#sheet-name").html(dTag)
         hideDashboard()
         if (authorParam) {
-          loadId(authorParam, dTag)
+          loadId(relay, authorParam, dTag)
         } else {
-          loadId(author, dTag)
+          loadId(relay, author, dTag)
         }
       } else {
         showDashboard()
         if (authorParam) {
-          loadDashboard(authorParam)
+          loadDashboard(relay, authorParam)
         } else {
-          loadDashboard(author)
+          loadDashboard(relay, author)
         }
       }
     }
@@ -231,9 +238,10 @@
       $("#dashboard").show();
     }
 
-    async function loadDashboard(author) {
+    async function loadDashboard(relay, author) {
       $("#sheets").html("");
-      fetchAllSpreadsheets(author, (ee) => {
+      
+      fetchAllSpreadsheets(relay, author, (ee) => {
         console.log("Event Received", ee)
 
         let currentVersion = expandedEvents.get(ee.address)
@@ -433,8 +441,8 @@
       }
     }
 
-    async function loadId(author, dTag) {
-      fetchSpreadSheet(author, dTag, (ee, data) => { 
+    async function loadId(relay, author, dTag) {
+      fetchSpreadSheet(relay, author, dTag, (ee, data) => { 
         var {
           UniverCore,
           UniverDesign,
